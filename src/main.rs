@@ -11,7 +11,7 @@ use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
 mod g4test {
-    use stm32g4::stm32g431;
+    use stm32g4::stm32g431::Peripherals;
 
     pub trait Led {
         fn on(&self);
@@ -19,11 +19,11 @@ mod g4test {
         fn toggle(&self);
     }    
     
-    pub struct Led0 {
-        perip: stm32g431::Peripherals,
+    pub struct Led0<'a> {
+        perip: &'a Peripherals,
     }
     
-    impl Led for Led0 {
+    impl<'a> Led for Led0<'a> {
         fn on(&self) {
             let gpioc = &self.perip.GPIOC;
             gpioc.bsrr.write(|w| w.bs13().set());
@@ -36,10 +36,13 @@ mod g4test {
             
         }
     }
-    impl Led0 {
-        pub fn new() -> Self {
+    impl<'a> Led0<'a> {
+        pub fn new(perip: &'a Peripherals) -> Self {
+            // Peripheralがいろんなところから変更されていいのか???
             // stm32f401モジュールより、ペリフェラルの入り口となるオブジェクトを取得する。
-            Self{perip: stm32g431::Peripherals::take().unwrap()}
+            Self{
+                perip,
+            }
         }
         pub fn init(&self) {
             // GPIOCポートの電源投入(クロックの有効化)
@@ -50,6 +53,7 @@ mod g4test {
             gpioc.moder.modify(|_,w| w.moder13().output());
         }
     }
+
     
 }
 
@@ -58,18 +62,21 @@ mod g4test {
 #[entry]
 fn main() -> ! {
     use g4test::Led;
+    use stm32g4::stm32g431;
 
     // hprintln!("Hello, STM32G4!").unwrap();
-    let led0 = g4test::Led0::new();
+    let perip = stm32g431::Peripherals::take().unwrap();
+    let led0 = g4test::Led0::new(&perip);
+
     led0.init();
     loop {
         loop {
             // hprintln!("Set Led High").unwrap();
-            for _ in 0..50_000 {
+            for _ in 0..10_000 {
                 led0.on();
             }
             // hprintln!("Set Led Low").unwrap();
-            for _ in 0..50_000 {
+            for _ in 0..10_000 {
                 led0.off();
             }
         }
