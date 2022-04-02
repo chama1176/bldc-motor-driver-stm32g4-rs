@@ -14,11 +14,33 @@ mod g4test {
     use stm32g4::stm32g431::Peripherals;
 
     pub trait Led {
+        // ここにnewっている？？👺
         fn on(&self);
         fn off(&self);
         fn toggle(&self);
     }    
-    
+
+    pub trait Potensio {
+        fn get_voltage(&self) -> f32;
+        fn get_value(&self) -> u16;
+    }    
+
+    pub trait NeoPixelRing {
+        fn get_length(&self) -> f32;
+        fn get_type(&self);
+        fn set_pin(&self);
+        fn set_pixel_color(&self);
+        fn get_pixel_color(&self);
+        fn set_brightness(&self);
+        fn get_brightness(&self);
+        fn clear(&self);
+
+        // implemeation for private function
+        // fn set_length(&self);
+        // fn set_type(&self);
+        
+    }    
+
     pub struct Led0<'a> {
         perip: &'a Peripherals,
     }
