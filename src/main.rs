@@ -3,34 +3,35 @@
 
 // pick a panicking behavior
 use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-// use panic_abort as _; // requires nightly
-// use panic_itm as _; // logs messages over ITM; requires ITM support
-// use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+                     // use panic_abort as _; // requires nightly
+                     // use panic_itm as _; // logs messages over ITM; requires ITM support
+                     // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
 mod g4test;
+mod periodic;
 mod led;
 
 mod app {
-    use crate::led;
+    use crate::periodic::PeriodicTask;
+    use crate::led::Led;
 
     pub struct App<'a> {
-        led0: &'a led::Led,
-        led1: &'a led::Led,
+        led0: &'a dyn Led,
+        led1: &'a dyn Led,
     }
-        
+
+    impl<'a> PeriodicTask for App<'a> {
+        fn run(&self) {
+    
+        }
+    } 
+
     impl<'a> App<'a> {
-        pub fn new(
-            led0: &'a led::Led, 
-            led1: &'a led::Led
-        ) -> Self {
-            
-            Self{
-                led0,
-                led1,
-            }
+        pub fn new(led0: &'a dyn Led, led1: &'a dyn Led) -> Self {
+            Self { led0, led1 }
         }
         pub fn spin(&self) {
             loop {
@@ -44,10 +45,9 @@ mod app {
                     self.led0.off();
                     self.led1.on();
                 }
-            }    
+            }
         }
     }
-    
 }
 
 #[entry]
@@ -59,13 +59,12 @@ fn main() -> ! {
     let perip = stm32g431::Peripherals::take().unwrap();
     let led0 = g4test::Led0::new(&perip);
     let led1 = g4test::Led1::new(&perip);
-    led0.init();
-    led1.init();
 
     let app = app::App::new(&led0, &led1);
-    app.spin();
-    // led とかをメンバー変数にしてそこに与える形？👺
+    g4test::Interrupt0::new(&perip, &app);
 
-    loop {
-    }
+
+    app.spin();
+
+    loop {}
 }

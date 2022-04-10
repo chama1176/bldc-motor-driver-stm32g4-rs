@@ -3,4 +3,4 @@ pub trait Led {
     fn on(&self);
     fn off(&self);
     fn toggle(&self);
-}    
+}
