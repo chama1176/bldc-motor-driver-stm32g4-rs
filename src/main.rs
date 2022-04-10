@@ -11,23 +11,15 @@ use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
 mod g4test;
-mod periodic;
 mod led;
 
 mod app {
-    use crate::periodic::PeriodicTask;
     use crate::led::Led;
 
     pub struct App<'a> {
         led0: &'a dyn Led,
         led1: &'a dyn Led,
     }
-
-    impl<'a> PeriodicTask for App<'a> {
-        fn run(&self) {
-    
-        }
-    } 
 
     impl<'a> App<'a> {
         pub fn new(led0: &'a dyn Led, led1: &'a dyn Led) -> Self {
@@ -47,6 +39,9 @@ mod app {
                 }
             }
         }
+        pub fn periodic_task(&self) {
+            self.led0.toggle();
+        }
     }
 }
 
@@ -61,8 +56,25 @@ fn main() -> ! {
     let led1 = g4test::Led1::new(&perip);
 
     let app = app::App::new(&led0, &led1);
-    g4test::Interrupt0::new(&perip, &app);
+    g4test::clock_init(&perip);
 
+    let mut t = perip.TIM3.cnt.read().cnt().bits();
+    let mut last_t = t;
+    // hprintln!("t: {}", t).unwrap();
+    let mut cnt = 0;
+    loop {
+        t = perip.TIM3.cnt.read().cnt().bits();
+        if t > last_t.wrapping_add(1000) {
+            cnt += 1;
+            // hprintln!("t: {}", t).unwrap();
+            if cnt > 200 {
+                app.periodic_task();
+                cnt = 0;
+            }
+            last_t = t;
+            // hprintln!("next: {}", last_t.wrapping_add(1000)).unwrap();
+        }
+    }
 
     app.spin();
 
