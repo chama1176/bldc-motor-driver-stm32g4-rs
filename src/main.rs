@@ -64,10 +64,10 @@ fn main() -> ! {
     let mut cnt = 0;
     loop {
         t = perip.TIM3.cnt.read().cnt().bits();
-        if t > last_t.wrapping_add(1000) {
+        if t > last_t.wrapping_add(250) {
             cnt += 1;
             // hprintln!("t: {}", t).unwrap();
-            if cnt > 200 {
+            if cnt > 0 {
                 app.periodic_task();
                 cnt = 0;
             }
