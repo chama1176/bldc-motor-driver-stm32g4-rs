@@ -10,10 +10,10 @@ pub fn clock_init(perip: &Peripherals) {
     perip.RCC.cr.modify(|_, w| w.hseon().on());
     while perip.RCC.cr.read().hserdy().is_not_ready() {}
 
-    // perip.RCC.pllcfgr.modify(|_, w| w.pllsrc().hsi16());
-    // perip.RCC.pllcfgr.modify(|_, w| w.pllm().div6());
-    // perip.RCC.pllcfgr.modify(|_, w| unsafe { w.plln().bits(85) });
-    // perip.RCC.pllcfgr.modify(|_, w| w.pllr().div2());
+    // Disable the PLL
+    perip.RCC.cr.modify(|_, w| w.pllon().off());
+    // Wait until PLL is fully stopped
+    while perip.RCC.cr.read().pllrdy().is_ready() {}
     perip.RCC.pllcfgr.modify(|_, w| w.pllsrc().hse());
     perip.RCC.pllcfgr.modify(|_, w| w.pllm().div12());
     // perip.RCC.pllcfgr.modify(|_, w| w.plln().div85());
@@ -22,27 +22,28 @@ pub fn clock_init(perip: &Peripherals) {
     
     perip.RCC.cr.modify(|_, w| w.pllon().on());
     while perip.RCC.cr.read().pllrdy().is_not_ready() {}
+    perip.RCC.pllcfgr.modify(|_, w| w.pllren().set_bit());
 
     perip.FLASH.acr.modify(|_,w| unsafe { w.latency().bits(4) });
     while perip.FLASH.acr.read().latency().bits() != 4 {
         hprintln!("latency bit: {}", perip.FLASH.acr.read().latency().bits()).unwrap();
     }
 
-    // perip.RCC.cfgr.modify(|_, w| w.sw().pll());
-    perip.RCC.cfgr.modify(|_, w| w.sw().hse());
-    hprintln!("sw bit: {}", perip.RCC.cfgr.read().sw().bits()).unwrap();
-    // while !perip.RCC.cfgr.read().sw().is_pll() {}
-    // while !perip.RCC.cfgr.read().sws().is_pll() {
-    //     hprintln!("sw bit: {}", perip.RCC.cfgr.read().sw().bits()).unwrap();
-    //     hprintln!("sws bit: {}", perip.RCC.cfgr.read().sws().bits()).unwrap();
-    // }
-    while !perip.RCC.cfgr.read().sws().is_hse() {}
+    perip.RCC.cfgr.modify(|_, w| w.sw().pll());
+    // perip.RCC.cfgr.modify(|_, w| w.sw().hse());
+    // hprintln!("sw bit: {}", perip.RCC.cfgr.read().sw().bits()).unwrap();
+    while !perip.RCC.cfgr.read().sw().is_pll() {}
+    while !perip.RCC.cfgr.read().sws().is_pll() {
+        // hprintln!("sw bit: {}", perip.RCC.cfgr.read().sw().bits()).unwrap();
+        // hprintln!("sws bit: {}", perip.RCC.cfgr.read().sws().bits()).unwrap();
+    }
+    // while !perip.RCC.cfgr.read().sws().is_hse() {}
 
     perip.RCC.apb1enr1.modify(|_,w| w.tim3en().enabled());
     
     let tim3 = &perip.TIM3;
     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
-    tim3.psc.modify(|_, w| unsafe { w.bits(48_000 - 1) });
+    tim3.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) });
     // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
