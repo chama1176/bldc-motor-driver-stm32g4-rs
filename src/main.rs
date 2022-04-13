@@ -12,6 +12,8 @@ use cortex_m_semihosting::hprintln;
 
 mod g4test;
 mod led;
+mod xprintln;
+
 
 mod app {
     use crate::led::Led;
@@ -24,20 +26,6 @@ mod app {
     impl<'a> App<'a> {
         pub fn new(led0: &'a dyn Led, led1: &'a dyn Led) -> Self {
             Self { led0, led1 }
-        }
-        pub fn spin(&self) {
-            loop {
-                // hprintln!("Set Led High").unwrap();
-                for _ in 0..10_000 {
-                    self.led0.on();
-                    self.led1.off();
-                }
-                // hprintln!("Set Led Low").unwrap();
-                for _ in 0..10_000 {
-                    self.led0.off();
-                    self.led1.on();
-                }
-            }
         }
         pub fn periodic_task(&self) {
             self.led0.toggle();
@@ -76,7 +64,4 @@ fn main() -> ! {
         }
     }
 
-    app.spin();
-
-    loop {}
 }

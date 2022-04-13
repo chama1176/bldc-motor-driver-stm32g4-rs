@@ -1,7 +1,30 @@
 use crate::led::Led;
 use stm32g4::stm32g431::Peripherals;
 use cortex_m_semihosting::hprintln;
+use crate::xprintln::Xprintln;
 
+pub struct UART0<'a> {
+    perip: &'a Peripherals,
+}
+
+impl<'a> Xprintln for UART0<'a> {
+    fn xprintln(&self) {
+        let gpioc = &self.perip.GPIOC;
+        gpioc.bsrr.write(|w| w.bs13().set());
+    }
+}
+
+impl<'a> UART0<'a> {
+    pub fn new(perip: &'a Peripherals, baudrate: u32) -> Self {
+
+        // baudrate設定とか
+
+        Self { perip }
+    }
+    fn putc() {
+
+    }
+}
 
     
 pub fn clock_init(perip: &Peripherals) {

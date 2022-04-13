@@ -1,3 +1,17 @@
+// ros::time::now的なのが欲しい。cortexlibでできる？
+
+pub struct Time {
+    time: f32,
+}
+
+impl Time {
+    pub fn now(&self) -> Self {
+        
+    }
+}
+
+
+
 pub trait Potensio {
     fn get_voltage(&self) -> f32;
     fn get_value(&self) -> u16;
