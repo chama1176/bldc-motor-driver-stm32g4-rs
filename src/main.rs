@@ -13,6 +13,7 @@ use core::fmt::Write;
 
 mod g4test;
 mod led;
+mod potensio;
 
 
 mod app {
@@ -45,7 +46,7 @@ fn main() -> ! {
 
     let app = app::App::new(&led0, &led1);
     g4test::clock_init(&perip);
-    let mut cout = g4test::Uart0::new(&perip);
+    let mut uart = g4test::Uart0::new(&perip);
 
     let mut t = perip.TIM3.cnt.read().cnt().bits();
     let mut prev = t;
@@ -58,9 +59,8 @@ fn main() -> ! {
             // hprintln!("t: {}", t).unwrap();
             if cnt > 0 {
                 app.periodic_task();
-                cout.write_str("hello");
-                write!(cout, "{} + {} = {}\r\n", 2, 3, 2+3);
-                // cout.putc('c' as u8);
+                uart.write_str("hello");
+                write!(uart, "{} + {} = {}\r\n", 2, 3, 2+3);
                 cnt = 0;
             }
             prev = t;

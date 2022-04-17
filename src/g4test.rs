@@ -1,4 +1,6 @@
 use crate::led::Led;
+use crate::potensio::Potensio;
+
 use stm32g4::stm32g431::Peripherals;
 use cortex_m_semihosting::hprintln;
 use core::fmt::{self, Write};
@@ -58,30 +60,12 @@ impl<'a> Uart0<'a> {
 
         Self { perip }
     }
-    pub fn putc(&self, c: u8) {
+    fn putc(&self, c: u8) {
         let uart = &self.perip.USART1;
         uart.tdr.modify(|_, w| unsafe{ w.tdr().bits(c.into()) });
         // while uart.isr.read().tc().bit_is_set() {}
         while uart.isr.read().txe().bit_is_clear() {}
     }
-    pub fn write_str(&self, s: &str) {
-        for c in s.bytes() {
-            self.putc(c);
-        }
-    }
-
-    // pub fn print(&mut self, ) {
-    //     ($($arg:tt)*) => ($Uart0::_print(format_args!($($arg)*)));
-    // }
-
-    // pub fn println(&mut self, ) {
-    //     ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    //     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-    // }
-
-    // pub fn print(&mut self, args: fmt::Arguments) {
-    //     self.write_fmt(args).unwrap();
-    // }
 
 }
 
@@ -131,6 +115,30 @@ pub fn clock_init(perip: &Peripherals) {
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
 }
+
+pub struct Potensio0<'a> {
+    perip: &'a Peripherals,
+}
+
+impl<'a> Potensio for Potensio0<'a> {
+    fn get_angle(&self) -> f32 {
+        0.0
+    }
+}
+
+impl<'a> Potensio0<'a> {
+    pub fn new(perip: &'a Peripherals) -> Self {
+        // GPIOポートの電源投入(クロックの有効化)
+        perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+
+        // gpioモード変更
+        let gpioc = &perip.GPIOC;
+        gpioc.moder.modify(|_, w| w.moder13().output());
+
+        Self { perip }
+    }
+}
+
 
 pub struct Led0<'a> {
     perip: &'a Peripherals,
