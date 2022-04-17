@@ -9,10 +9,10 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
+use core::fmt::Write;
 
 mod g4test;
 mod led;
-mod xprintln;
 
 
 mod app {
@@ -45,21 +45,25 @@ fn main() -> ! {
 
     let app = app::App::new(&led0, &led1);
     g4test::clock_init(&perip);
+    let mut cout = g4test::Uart0::new(&perip);
 
     let mut t = perip.TIM3.cnt.read().cnt().bits();
-    let mut last_t = t;
+    let mut prev = t;
     // hprintln!("t: {}", t).unwrap();
     let mut cnt = 0;
     loop {
         t = perip.TIM3.cnt.read().cnt().bits();
-        if t > last_t.wrapping_add(5000) {
+        if t.wrapping_sub(prev) > 10000 {
             cnt += 1;
             // hprintln!("t: {}", t).unwrap();
             if cnt > 0 {
                 app.periodic_task();
+                cout.write_str("hello");
+                write!(cout, "{} + {} = {}\r\n", 2, 3, 2+3);
+                // cout.putc('c' as u8);
                 cnt = 0;
             }
-            last_t = t;
+            prev = t;
             // hprintln!("next: {}", last_t.wrapping_add(1000)).unwrap();
         }
     }

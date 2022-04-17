@@ -1,29 +1,88 @@
 use crate::led::Led;
 use stm32g4::stm32g431::Peripherals;
 use cortex_m_semihosting::hprintln;
-use crate::xprintln::Xprintln;
+use core::fmt::{self, Write};
 
-pub struct UART0<'a> {
+
+pub struct Uart0<'a> {
     perip: &'a Peripherals,
 }
 
-impl<'a> Xprintln for UART0<'a> {
-    fn xprintln(&self) {
-        let gpioc = &self.perip.GPIOC;
-        gpioc.bsrr.write(|w| w.bs13().set());
+impl<'a> Write for Uart0<'a> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.bytes() {
+            self.putc(c);
+        }
+        Ok(())
     }
 }
 
-impl<'a> UART0<'a> {
-    pub fn new(perip: &'a Peripherals, baudrate: u32) -> Self {
+impl<'a> Uart0<'a> {
+    pub fn new(perip: &'a Peripherals) -> Self {
+        
+        // GPIOポートの電源投入(クロックの有効化)
+        perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
 
-        // baudrate設定とか
+        perip.RCC.apb2enr.modify(|_, w| w.usart1en().enabled());
+
+        // gpioモード変更
+        let gpiob = &perip.GPIOB;
+        gpiob.moder.modify(|_, w| w.moder6().alternate());
+        gpiob.moder.modify(|_, w| w.moder7().alternate());
+        gpiob.afrl.modify(|_, w| w.afrl6().af7());
+        gpiob.afrl.modify(|_, w| w.afrl7().af7());
+        
+        let uart = &perip.USART1;
+        // Set over sampling mode
+        uart.cr1.modify(|_, w| w.over8().clear_bit());
+        // Set parity mode
+        uart.cr1.modify(|_, w| w.pce().clear_bit());
+        // Set word length
+        uart.cr1.modify(|_, w| w.m0().clear_bit());
+        uart.cr1.modify(|_, w| w.m1().clear_bit());
+        // FIFO?
+        // Set baud rate
+        uart.brr.modify(|_, w| unsafe{ w.bits(0x4BF) });    // 140MHz / 115200
+
+        // Set stop bit
+        uart.cr2.modify(|_, w| unsafe{ w.stop().bits(0b00) });
+
+        // Set uart enable
+        uart.cr1.modify(|_, w| w.ue().set_bit());
+
+        // Set uart recieve enable
+        uart.cr1.modify(|_, w| w.re().set_bit());
+        // Set uart transmitter enable
+        uart.cr1.modify(|_, w| w.te().set_bit());
+
 
         Self { perip }
     }
-    fn putc() {
-
+    pub fn putc(&self, c: u8) {
+        let uart = &self.perip.USART1;
+        uart.tdr.modify(|_, w| unsafe{ w.tdr().bits(c.into()) });
+        // while uart.isr.read().tc().bit_is_set() {}
+        while uart.isr.read().txe().bit_is_clear() {}
     }
+    pub fn write_str(&self, s: &str) {
+        for c in s.bytes() {
+            self.putc(c);
+        }
+    }
+
+    // pub fn print(&mut self, ) {
+    //     ($($arg:tt)*) => ($Uart0::_print(format_args!($($arg)*)));
+    // }
+
+    // pub fn println(&mut self, ) {
+    //     ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    //     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    // }
+
+    // pub fn print(&mut self, args: fmt::Arguments) {
+    //     self.write_fmt(args).unwrap();
+    // }
+
 }
 
     
@@ -98,10 +157,10 @@ impl<'a> Led for Led0<'a> {
 
 impl<'a> Led0<'a> {
     pub fn new(perip: &'a Peripherals) -> Self {
-        // GPIOCポートの電源投入(クロックの有効化)
+        // GPIOポートの電源投入(クロックの有効化)
         perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
 
-        // gpio初期化(PC13を出力に指定)
+        // gpioモード変更
         let gpioc = &perip.GPIOC;
         gpioc.moder.modify(|_, w| w.moder13().output());
 
@@ -134,10 +193,10 @@ impl<'a> Led for Led1<'a> {
 
 impl<'a> Led1<'a> {
     pub fn new(perip: &'a Peripherals) -> Self {
-        // GPIOCポートの電源投入(クロックの有効化)
+        // GPIOポートの電源投入(クロックの有効化)
         perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
 
-        // gpio初期化(PC14を出力に指定)
+        // gpioモード変更
         let gpioc = &perip.GPIOC;
         gpioc.moder.modify(|_, w| w.moder14().output());
 
