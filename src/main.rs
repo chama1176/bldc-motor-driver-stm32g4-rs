@@ -12,20 +12,20 @@ use cortex_m_semihosting::hprintln;
 use core::fmt::Write;
 
 mod g4test;
-mod led;
+mod indicator;
 mod potensio;
 
 
 mod app {
-    use crate::led::Led;
+    use crate::indicator::Indicator;
 
     pub struct App<'a> {
-        led0: &'a dyn Led,
-        led1: &'a dyn Led,
+        led0: &'a dyn Indicator,
+        led1: &'a dyn Indicator,
     }
 
     impl<'a> App<'a> {
-        pub fn new(led0: &'a dyn Led, led1: &'a dyn Led) -> Self {
+        pub fn new(led0: &'a dyn Indicator, led1: &'a dyn Indicator) -> Self {
             Self { led0, led1 }
         }
         pub fn periodic_task(&self) {

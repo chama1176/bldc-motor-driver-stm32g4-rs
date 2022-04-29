@@ -1,4 +1,4 @@
-use crate::led::Led;
+use crate::indicator::Indicator;
 use crate::potensio::Potensio;
 
 use stm32g4::stm32g431::Peripherals;
@@ -158,7 +158,7 @@ impl<'a> Potensio0<'a> {
         adc.smpr1.modify(|_, w| w.smp3().cycles2_5());   // sampling time selection
         // adc.smpr1.modify(|_, w| w.smp4().cycles2_5());   // sampling time selection
 
-        adc.sqr1.modify(|_, w| w.l().bits(0));   // Regular channel sequence length
+        adc.sqr1.modify(|_, w| w.l().bits(0));   // Regular channel sequence length. 0 means 1 length
         adc.sqr1.modify(|_, w| unsafe{ w.sq1().bits(3) });   // 1st conversion in regular sequence
 
         adc.cr.modify(|_, w| w.aden().enable());   // ADC enable control
@@ -187,7 +187,7 @@ pub struct Led0<'a> {
     perip: &'a Peripherals,
 }
 
-impl<'a> Led for Led0<'a> {
+impl<'a> Indicator for Led0<'a> {
     fn on(&self) {
         let gpioc = &self.perip.GPIOC;
         gpioc.bsrr.write(|w| w.bs13().set());
@@ -223,7 +223,7 @@ pub struct Led1<'a> {
     perip: &'a Peripherals,
 }
 
-impl<'a> Led for Led1<'a> {
+impl<'a> Indicator for Led1<'a> {
     fn on(&self) {
         let gpioc = &self.perip.GPIOC;
         gpioc.bsrr.write(|w| w.bs14().set());
