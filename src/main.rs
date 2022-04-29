@@ -48,6 +48,8 @@ fn main() -> ! {
     g4test::clock_init(&perip);
     let mut uart = g4test::Uart0::new(&perip);
 
+    let potensio0 = g4test::Potensio0::new(&perip);
+
     let mut t = perip.TIM3.cnt.read().cnt().bits();
     let mut prev = t;
     // hprintln!("t: {}", t).unwrap();
@@ -59,8 +61,10 @@ fn main() -> ! {
             // hprintln!("t: {}", t).unwrap();
             if cnt > 0 {
                 app.periodic_task();
+
                 uart.write_str("hello");
                 write!(uart, "{} + {} = {}\r\n", 2, 3, 2+3);
+                write!(uart, "{} \r\n", potensio0.sigle_conversion());
                 cnt = 0;
             }
             prev = t;

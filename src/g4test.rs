@@ -129,13 +129,56 @@ impl<'a> Potensio for Potensio0<'a> {
 impl<'a> Potensio0<'a> {
     pub fn new(perip: &'a Peripherals) -> Self {
         // GPIOポートの電源投入(クロックの有効化)
-        perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+        perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
+
+        perip.RCC.ahb2enr.modify(|_, w| w.adc12en().set_bit());
+        perip.RCC.ccipr.modify(|_, w| w.adc12sel().system());   // clock source setting
 
         // gpioモード変更
-        let gpioc = &perip.GPIOC;
-        gpioc.moder.modify(|_, w| w.moder13().output());
+        let gpio = &perip.GPIOA;
+        gpio.moder.modify(|_, w| w.moder6().analog());
+        gpio.moder.modify(|_, w| w.moder7().analog());
+
+        let adc = &perip.ADC2;
+        adc.cfgr.modify(|_, w| w.res().bits12());   // Resolution setting
+        adc.cfgr.modify(|_, w| w.align().right());   // Data align setting
+        adc.cfgr.modify(|_, w| w.cont().single());   // single or continuous
+
+        perip.ADC12_COMMON.ccr.modify(|_, w| unsafe{ w.presc().bits(0b0010) }); // Clock prescaler setting
+
+        adc.cr.modify(|_, w| w.deeppwd().disabled());   // Deep power down setting
+        adc.cr.modify(|_, w| w.advregen().enabled());   // Voltage regulator setting
+        // ADC voltage regulator start-up time 20us
+        let mut t = perip.TIM3.cnt.read().cnt().bits();
+        let prev = t;
+        while t.wrapping_sub(prev) >= 1 {
+            t = perip.TIM3.cnt.read().cnt().bits();
+        }
+
+        adc.smpr1.modify(|_, w| w.smp3().cycles2_5());   // sampling time selection
+        // adc.smpr1.modify(|_, w| w.smp4().cycles2_5());   // sampling time selection
+
+        adc.sqr1.modify(|_, w| w.l().bits(0));   // Regular channel sequence length
+        adc.sqr1.modify(|_, w| unsafe{ w.sq1().bits(3) });   // 1st conversion in regular sequence
+
+        adc.cr.modify(|_, w| w.aden().enable());   // ADC enable control
+
+        while adc.isr.read().adrdy().is_not_ready() {
+            // Wait for ADC ready
+        }
 
         Self { perip }
+    }
+    pub fn sigle_conversion(&self) -> u16 {
+        let adc = &self.perip.ADC2;
+        adc.cr.modify(|_, w| w.adstart().start());   // ADC start
+        while adc.isr.read().eoc().is_not_complete() {
+            // Wait for ADC complete
+        }
+        adc.isr.modify(|_, w| w.eoc().clear());   // clear eoc flag
+        
+        adc.dr.read().rdata().bits() 
+
     }
 }
 
