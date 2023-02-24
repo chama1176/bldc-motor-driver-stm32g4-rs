@@ -134,5 +134,17 @@ to intervene to uphold that code of conduct.
 [CoC]: https://www.rust-lang.org/policies/code-of-conduct
 [team]: https://github.com/rust-embedded/wg#the-cortex-m-team
 
+## How to Run 
+
+Run command below.
+```
+openocd
+```
+And, another terminal 
+```
+cargo run
+```
+These command run openocd and connect to that, with gdb debugger.
+
 ## Memo
 - 

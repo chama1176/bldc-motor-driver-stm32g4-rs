@@ -62,8 +62,8 @@ fn main() -> ! {
             if cnt > 0 {
                 app.periodic_task();
 
-                uart.write_str("hello");
-                write!(uart, "{} + {} = {}\r\n", 2, 3, 2+3);
+                uart.write_str("hello ");
+                write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 write!(uart, "{} \r\n", potensio0.sigle_conversion());
                 cnt = 0;
             }
