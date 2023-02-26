@@ -1,7 +1,13 @@
 use crate::indicator::Indicator;
 use crate::potensio::Potensio;
+use crate::fsr::Fsr;
 
 use stm32g4::stm32g431::Peripherals;
+use stm32g4::stm32g431::CorePeripherals;
+use stm32g4::stm32g431::Interrupt;
+use stm32g4::stm32g431::NVIC;
+
+#[allow(unused_imports)]
 use cortex_m_semihosting::hprintln;
 use core::fmt::{self, Write};
 
@@ -116,56 +122,137 @@ pub fn clock_init(perip: &Peripherals) {
 
 }
 
-pub struct Potensio0<'a> {
-    perip: &'a Peripherals,
-}
+pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals, adc_dma_buf: &[u16; 4]) {
+    // DMAの電源投入(クロックの有効化)
+    // perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().reset());
+    // perip.RCC.ahb1rstr.modify(|_, w| w.dma2rst().reset());
+    perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().set_bit());
+    perip.RCC.ahb1rstr.modify(|_, w| w.dma2rst().set_bit());
+    perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().clear_bit());
+    perip.RCC.ahb1rstr.modify(|_, w| w.dma2rst().clear_bit());
+    perip.RCC.ahb1enr.modify(|_, w| w.dmamuxen().set_bit());
+    perip.RCC.ahb1enr.modify(|_, w| w.dma2en().set_bit());
 
-impl<'a> Potensio for Potensio0<'a> {
-    fn get_angle(&self) -> f32 {
-        0.0
+    perip.DMA2.ccr1.modify(|_, w| unsafe { w.pl().bits(0b10) });  // priority level 2
+    perip.DMA2.ccr1.modify(|_, w| unsafe { w.msize().bits(0b01) });  // 16bit
+    perip.DMA2.ccr1.modify(|_, w| unsafe { w.psize().bits(0b01) });  // 16bit
+    perip.DMA2.ccr1.modify(|_, w| w.circ().set_bit());  // circular mode
+    perip.DMA2.ccr1.modify(|_, w| w.minc().set_bit());  // increment memory ptr
+    perip.DMA2.ccr1.modify(|_, w| w.pinc().clear_bit());  // not increment periph  ptr
+    perip.DMA2.ccr1.modify(|_, w| w.mem2mem().clear_bit());  // memory-to-memory mode
+    perip.DMA2.ccr1.modify(|_, w| w.dir().clear_bit());  // read from periphera
+    perip.DMA2.ccr1.modify(|_, w| w.teie().clear_bit());  // transfer error interrupt enable
+    perip.DMA2.ccr1.modify(|_, w| w.htie().clear_bit());  // half transfer interrupt enable
+    perip.DMA2.ccr1.modify(|_, w| w.tcie().clear_bit());  // transfer complete interrupt enable
+
+    // For category 2 devices:
+    // • DMAMUX channels 0 to 5 are connected to DMA1 channels 1 to 6
+    // • DMAMUX channels 6 to 11 are connected to DMA2 channels 1 to 6
+    // DMA2 ch1 -> DMAMUX ch6
+    perip.DMAMUX.c6cr.modify(|_, w| unsafe { w.dmareq_id().bits(36) });     // Table.91 36:ADC2
+
+    let adc = &perip.ADC2;
+    let adc_data_register_addr = &adc.dr as *const _ as u32;
+    let adc_dma_buf_addr : u32 = adc_dma_buf as *const [u16; 4] as u32;
+    // perip.DMA2.cpar1.modify(|_, w| unsafe { w.pa().bits(*adc.dr.as_ptr()) });   // peripheral address
+    perip.DMA2.cpar1.modify(|_, w| unsafe { w.pa().bits(adc_data_register_addr) });   // peripheral address
+    // perip.DMA2.cndtr1.modify(|_, w| unsafe { w.ndt().bits(adc_dma_buf.len() as u16) }); // num
+    perip.DMA2.cndtr1.modify(|_, w| unsafe { w.ndt().bits(4) }); // num
+    perip.DMA2.cmar1.modify(|_, w| unsafe { w.ma().bits(adc_dma_buf_addr) });      // memory address
+    
+    // 割り込み設定
+    unsafe{
+        core_perip.NVIC.set_priority(Interrupt::DMA2_CH1, 0);
+        NVIC::unmask(Interrupt::DMA2_CH1);    
     }
 }
 
-impl<'a> Potensio0<'a> {
-    pub fn new(perip: &'a Peripherals) -> Self {
+pub fn adc2_init(perip: &Peripherals) {
         // GPIOポートの電源投入(クロックの有効化)
         perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
+        perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
 
         perip.RCC.ahb2enr.modify(|_, w| w.adc12en().set_bit());
         perip.RCC.ccipr.modify(|_, w| w.adc12sel().system());   // clock source setting
-
+        
         // gpioモード変更
-        let gpio = &perip.GPIOA;
-        gpio.moder.modify(|_, w| w.moder6().analog());
-        gpio.moder.modify(|_, w| w.moder7().analog());
+        perip.GPIOA.moder.modify(|_, w| w.moder5().analog());
+        perip.GPIOA.moder.modify(|_, w| w.moder6().analog());
+        perip.GPIOA.moder.modify(|_, w| w.moder7().analog());
+        perip.GPIOB.moder.modify(|_, w| w.moder2().analog());
 
         let adc = &perip.ADC2;
         adc.cfgr.modify(|_, w| w.res().bits12());   // Resolution setting
         adc.cfgr.modify(|_, w| w.align().right());   // Data align setting
+        adc.cfgr.modify(|_, w| w.ovrmod().overwrite());   // Overrun mode
+
         adc.cfgr.modify(|_, w| w.cont().single());   // single or continuous
+        // adc.cfgr.modify(|_, w| w.cont().continuous());   // single or continuous
+        adc.cfgr.modify(|_, w| w.discen().disabled());   // single or continuous
+        // adc.cfgr.modify(|_, w| w.discen().enabled());   // single or continuous
+        // DISCEN = 1 and CONT = 1 is not allowed.
+        // adc.cfgr.modify(|_, w| w.discnum().bits(4-1));   // 0 means 1 length
+
+        adc.cfgr.modify(|_, w| w.dmacfg().circular());   // dma oneshot or circular
+        adc.cfgr.modify(|_, w| w.dmaen().enabled());   // dma enable
+        // 1周は実行したいが，常に変換しつづけるのは困る
 
         perip.ADC12_COMMON.ccr.modify(|_, w| unsafe{ w.presc().bits(0b0010) }); // Clock prescaler setting
 
         adc.cr.modify(|_, w| w.deeppwd().disabled());   // Deep power down setting
         adc.cr.modify(|_, w| w.advregen().enabled());   // Voltage regulator setting
-        // ADC voltage regulator start-up time 20us
+        adc.ier.modify(|_, w| w.eocie().enabled());   // End of regular conversion interrupt setting
+        // adc.ier.modify(|_, w| w.eocie().disabled());   // End of regular conversion interrupt setting
+        // // ADC voltage regulator start-up time 20us
         let mut t = perip.TIM3.cnt.read().cnt().bits();
         let prev = t;
         while t.wrapping_sub(prev) >= 1 {
             t = perip.TIM3.cnt.read().cnt().bits();
         }
 
-        adc.smpr1.modify(|_, w| w.smp3().cycles2_5());   // sampling time selection
-        // adc.smpr1.modify(|_, w| w.smp4().cycles2_5());   // sampling time selection
+        adc.smpr1.modify(|_, w| w.smp3().cycles24_5());   // sampling time selection
+        adc.smpr1.modify(|_, w| w.smp4().cycles24_5());   // sampling time selection
+        adc.smpr2.modify(|_, w| w.smp12().cycles24_5());   // sampling time selection
+        adc.smpr2.modify(|_, w| w.smp13().cycles24_5());   // sampling time selection
 
-        adc.sqr1.modify(|_, w| w.l().bits(0));   // Regular channel sequence length. 0 means 1 length
-        adc.sqr1.modify(|_, w| unsafe{ w.sq1().bits(3) });   // 1st conversion in regular sequence
+        adc.sqr1.modify(|_, w| w.l().bits(4-1));   // Regular channel sequence length. 0 means 1 length
+        adc.sqr1.modify(|_, w| unsafe{ w.sq1().bits(13) });   // 1st conversion in regular sequence
+        adc.sqr1.modify(|_, w| unsafe{ w.sq2().bits(4) });   // 1st conversion in regular sequence
+        adc.sqr1.modify(|_, w| unsafe{ w.sq3().bits(12) });   // 1st conversion in regular sequence
+        adc.sqr1.modify(|_, w| unsafe{ w.sq4().bits(3) });   // 1st conversion in regular sequence
 
-        adc.cr.modify(|_, w| w.aden().enable());   // ADC enable control
+}
 
-        while adc.isr.read().adrdy().is_not_ready() {
-            // Wait for ADC ready
-        }
+pub fn dma_adc2_start(perip: &Peripherals) {
+    // enable DMA
+    perip.DMA2.ccr1.modify(|_, w| w.en().set_bit());
+
+    let adc = &perip.ADC2;
+    // enable ADC
+    adc.cr.modify(|_, w| w.aden().enable());   // ADC enable control
+    while adc.isr.read().adrdy().is_not_ready() {
+        // Wait for ADC ready
+    }
+    // Start ADC
+    adc.isr.modify(|_, w| w.eoc().clear());   // clear eoc flag
+    adc.isr.modify(|_, w| w.eos().clear());   // clear eoc flag
+
+    adc.cr.modify(|_, w| w.adstart().start());   // ADC start
+
+}
+
+pub struct Fsr0<'a> {
+    perip: &'a Peripherals,
+}
+
+impl<'a> Fsr for Fsr0<'a> {
+    fn get_force(&self) -> f32 {
+        0.0
+    }
+}
+
+impl<'a> Fsr0<'a> {
+    pub fn new(perip: &'a Peripherals) -> Self {
 
         Self { perip }
     }
@@ -181,7 +268,6 @@ impl<'a> Potensio0<'a> {
 
     }
 }
-
 
 pub struct Led0<'a> {
     perip: &'a Peripherals,
