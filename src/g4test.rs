@@ -121,12 +121,11 @@ pub fn clock_init(perip: &Peripherals) {
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
-    // let tim6 = &perip.TIM6;
-    // tim6.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) });
-    // tim6.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
-    // tim6.dier.modify(|_, w| w.uie().set_bit());
-    // tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
-    // tim6.cr1.modify(|_, w| w.cen().set_bit());
+    let tim6 = &perip.TIM6;
+    tim6.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) });
+    tim6.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
+    tim6.dier.modify(|_, w| w.uie().set_bit());
+    tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 
 }
 
@@ -160,8 +159,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals, address: 
     perip.DMAMUX.c0cr.modify(|_, w| unsafe { w.dmareq_id().bits(36) });     // Table.91 36:ADC2
     perip.DMAMUX.c0cr.modify(|_, w| w.ege().set_bit() );     // Enable generate event
 
-    // let adc = &perip.ADC2;
-    let adc = unsafe { &(*stm32g4::stm32g431::ADC2::ptr()) };
+    let adc = &perip.ADC2;
     let adc_data_register_addr = &adc.dr as *const _ as u32;
     // let adc_dma_buf_addr : u32 = adc_dma_buf as *const [u16; 4] as u32;
     // perip.DMA1.cpar1.modify(|_, w| unsafe { w.pa().bits(*adc.dr.as_ptr()) });   // peripheral address
@@ -216,9 +214,9 @@ pub fn adc2_init(perip: &Peripherals) {
 
         adc.cr.modify(|_, w| w.deeppwd().disabled());   // Deep power down setting
         adc.cr.modify(|_, w| w.advregen().enabled());   // Voltage regulator setting
-        adc.ier.modify(|_, w| w.eocie().enabled());   // End of regular conversion interrupt setting
-        // adc.ier.modify(|_, w| w.eocie().disabled());   // End of regular conversion interrupt setting
-        adc.ier.modify(|_, w| w.ovrie().enabled());   // End of regular conversion interrupt setting
+        // adc.ier.modify(|_, w| w.eocie().enabled());   // End of regular conversion interrupt setting
+        adc.ier.modify(|_, w| w.eocie().disabled());   // End of regular conversion interrupt setting
+        adc.ier.modify(|_, w| w.ovrie().enabled());   // Overrun interrupt setting
         // // ADC voltage regulator start-up time 20us
         let mut t = perip.TIM3.cnt.read().cnt().bits();
         let prev = t;
@@ -251,10 +249,6 @@ pub fn dma_adc2_start(perip: &Peripherals) {
         // Wait for ADC ready
     }
     let tim6 = &perip.TIM6;
-    tim6.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) });
-    tim6.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
-    tim6.dier.modify(|_, w| w.uie().set_bit());
-    tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
     tim6.cr1.modify(|_, w| w.cen().set_bit());
 
     // Start ADC

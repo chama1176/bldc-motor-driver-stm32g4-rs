@@ -64,7 +64,6 @@ fn main() -> ! {
     let mut prev = t;
     // hprintln!("t: {}", t).unwrap();
     let mut cnt = 0;
-    let mut index = 0;
     loop {
         t = perip.TIM3.cnt.read().cnt().bits();
         if t.wrapping_sub(prev) > 1000 {
@@ -80,10 +79,6 @@ fn main() -> ! {
                 }
                 // write!(uart, "{} \r\n", potensio0.sigle_conversion());
                 cnt = 0;
-
-                let adc = &perip.ADC2;
-                write!(uart, "{}: {}\r\n", index%4, adc.dr.read().rdata().bits());
-                index += 1;
             }
             prev = t;
             // hprintln!("next: {}", last_t.wrapping_add(1000)).unwrap();
