@@ -35,7 +35,7 @@ mod app {
     }
 }
 
-static adc_data:[u16; 4] = [7; 4];
+// static adc_data:[u16; 4] = [7; 4];
 
 #[entry]
 fn main() -> ! {
@@ -51,7 +51,10 @@ fn main() -> ! {
     let app = app::App::new(&led0, &led1);
     g4test::clock_init(&perip);
     g4test::adc2_init(&perip);
-    g4test::dma_init(&perip, &mut core_perip, &adc_data);
+
+    let adc_data:[u16; 4] = [7; 4];
+    let dma_buf_addr: u32 = adc_data.as_ptr() as u32;
+    g4test::dma_init(&perip, &mut core_perip, dma_buf_addr);
     let mut uart = g4test::Uart0::new(&perip);
     g4test::dma_adc2_start(&perip);
 
@@ -79,15 +82,6 @@ fn main() -> ! {
                 cnt = 0;
 
                 let adc = &perip.ADC2;
-                adc.cr.modify(|_, w| w.adstart().start());   // ADC start
-                // while adc.isr.read().eoc().is_not_complete() {
-                //     // Wait for ADC complete
-                // }
-                // while adc.isr.read().eos().is_not_complete() {
-                //     // Wait for ADC complete
-                // }
-                // adc.isr.modify(|_, w| w.eoc().clear());   // clear eoc flag
-                // adc.isr.modify(|_, w| w.eos().clear());   // clear eoc flag
                 write!(uart, "{}: {}\r\n", index%4, adc.dr.read().rdata().bits());
                 index += 1;
             }
