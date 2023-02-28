@@ -223,6 +223,10 @@ pub fn adc2_init(perip: &Peripherals) {
         while t.wrapping_sub(prev) >= 1 {
             t = perip.TIM3.cnt.read().cnt().bits();
         }
+        // P.604 21.4.8 calibration
+        assert!(adc.cr.read().aden().is_enable() == false);
+        adc.cr.modify(|_, w| w.adcal().calibration());   // Start calibration
+        while !adc.cr.read().adcal().is_complete() {}     // Wait for calibration complete
 
         adc.smpr1.modify(|_, w| w.smp3().cycles24_5());   // sampling time selection
         adc.smpr1.modify(|_, w| w.smp4().cycles24_5());   // sampling time selection
