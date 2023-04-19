@@ -23,14 +23,17 @@ mod app {
     pub struct App<'a> {
         led0: &'a dyn Indicator,
         led1: &'a dyn Indicator,
+        led2: &'a dyn Indicator,
     }
 
     impl<'a> App<'a> {
-        pub fn new(led0: &'a dyn Indicator, led1: &'a dyn Indicator) -> Self {
-            Self { led0, led1 }
+        pub fn new(led0: &'a dyn Indicator, led1: &'a dyn Indicator, led2: &'a dyn Indicator) -> Self {
+            Self { led0, led1, led2 }
         }
         pub fn periodic_task(&self) {
             self.led0.toggle();
+            self.led1.toggle();
+            self.led2.toggle();
         }
     }
 }
@@ -47,8 +50,9 @@ fn main() -> ! {
     let mut core_perip = stm32g431::CorePeripherals::take().unwrap();
     let led0 = g4test::Led0::new(&perip);
     let led1 = g4test::Led1::new(&perip);
+    let led2 = g4test::Led2::new(&perip);
 
-    let app = app::App::new(&led0, &led1);
+    let app = app::App::new(&led0, &led1, &led2);
     g4test::clock_init(&perip);
     g4test::adc2_init(&perip);
 
@@ -64,18 +68,22 @@ fn main() -> ! {
     let mut prev = t;
     // hprintln!("t: {}", t).unwrap();
     let mut cnt = 0;
+    let mut adc_data_fir:[u16; 4] = [0; 4];
     loop {
         t = perip.TIM3.cnt.read().cnt().bits();
-        if t.wrapping_sub(prev) > 1000 {
+        if t.wrapping_sub(prev) > 10 {
+            for i in 0..4 {
+                adc_data_fir[i] = (adc_data_fir[i] as f32 * 0.9 + adc_data[i] as f32 * 0.1) as u16;
+            }
             cnt += 1;
             // hprintln!("t: {}", t).unwrap();
-            if cnt > 0 {
+            if cnt > 100 {
                 app.periodic_task();
 
-                uart.write_str("hello ");
-                write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
+                // uart.write_str("hello ");
+                // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 unsafe{
-                    write!(uart, "{}, {}, {}, {}\r\n", adc_data[0], adc_data[1], adc_data[2], adc_data[3]);
+                    write!(uart, "{{\"FSR\":[{}, {}, {}, {}]}}\r\n", adc_data_fir[3], adc_data_fir[0], adc_data_fir[1], adc_data_fir[2]);
                 }
                 // write!(uart, "{} \r\n", potensio0.sigle_conversion());
                 cnt = 0;

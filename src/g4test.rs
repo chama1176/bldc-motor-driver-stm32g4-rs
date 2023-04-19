@@ -220,7 +220,7 @@ pub fn adc2_init(perip: &Peripherals) {
         // // ADC voltage regulator start-up time 20us
         let mut t = perip.TIM3.cnt.read().cnt().bits();
         let prev = t;
-        while t.wrapping_sub(prev) >= 1 {
+        while t.wrapping_sub(prev) >= 10 {
             t = perip.TIM3.cnt.read().cnt().bits();
         }
         // P.604 21.4.8 calibration
@@ -355,6 +355,42 @@ impl<'a> Led1<'a> {
         // gpioモード変更
         let gpioc = &perip.GPIOC;
         gpioc.moder.modify(|_, w| w.moder14().output());
+
+        Self { perip }
+    }
+}
+
+pub struct Led2<'a> {
+    perip: &'a Peripherals,
+}
+
+impl<'a> Indicator for Led2<'a> {
+    fn on(&self) {
+        let gpioc = &self.perip.GPIOC;
+        gpioc.bsrr.write(|w| w.bs15().set());
+    }
+    fn off(&self) {
+        let gpioc = &self.perip.GPIOC;
+        gpioc.bsrr.write(|w| w.br15().reset());
+    }
+    fn toggle(&self) {
+        let gpioc = &self.perip.GPIOC;
+        if gpioc.odr.read().odr15().is_low() {
+            gpioc.bsrr.write(|w| w.bs15().set());
+        } else {
+            gpioc.bsrr.write(|w| w.br15().reset());
+        }
+    }
+}
+
+impl<'a> Led2<'a> {
+    pub fn new(perip: &'a Peripherals) -> Self {
+        // GPIOポートの電源投入(クロックの有効化)
+        perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+
+        // gpioモード変更
+        let gpioc = &perip.GPIOC;
+        gpioc.moder.modify(|_, w| w.moder15().output());
 
         Self { perip }
     }
