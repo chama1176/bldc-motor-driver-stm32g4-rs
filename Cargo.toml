@@ -2,7 +2,7 @@
 authors = ["kaede <kaede6120@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "test-g4"
+name = "imu-fsr-stm32g4"
 version = "0.1.0"
 
 [dependencies]
@@ -30,7 +30,7 @@ version = "0.14.0"
 
 # this lets you use `cargo fix`!
 [[bin]]
-name = "test-g4"
+name = "imu-fsr-stm32g4"
 test = false
 bench = false
 
