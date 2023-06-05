@@ -1,10 +1,9 @@
 name: Rust
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  [push, pull_request]
+  schedule:
+    - cron: '30 5 * * 3' # 5:30 UTC on Wednesday 
 
 env:
   CARGO_TERM_COLOR: always
