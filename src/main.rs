@@ -11,7 +11,7 @@ use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 use core::fmt::Write;
 
-mod g4test;
+mod imu_fsr_stm32g4;
 mod indicator;
 mod potensio;
 
@@ -41,14 +41,14 @@ fn main() -> ! {
     // hprintln!("Hello, STM32G4!").unwrap();
     // stm32f401モジュールより、ペリフェラルの入り口となるオブジェクトを取得する。
     let perip = stm32g431::Peripherals::take().unwrap();
-    let led0 = g4test::Led0::new(&perip);
-    let led1 = g4test::Led1::new(&perip);
+    let led0 = imu_fsr_stm32g4::Led0::new(&perip);
+    let led1 = imu_fsr_stm32g4::Led1::new(&perip);
 
     let app = app::App::new(&led0, &led1);
-    g4test::clock_init(&perip);
-    let mut uart = g4test::Uart0::new(&perip);
+    imu_fsr_stm32g4::clock_init(&perip);
+    let mut uart = imu_fsr_stm32g4::Uart0::new(&perip);
 
-    let potensio0 = g4test::Potensio0::new(&perip);
+    let potensio0 = imu_fsr_stm32g4::Potensio0::new(&perip);
 
     let mut t = perip.TIM3.cnt.read().cnt().bits();
     let mut prev = t;
