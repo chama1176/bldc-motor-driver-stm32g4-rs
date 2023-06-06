@@ -7,14 +7,13 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
                      // use panic_itm as _; // logs messages over ITM; requires ITM support
                      // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
+use core::fmt::Write;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
-use core::fmt::Write;
 
 mod imu_fsr_stm32g4;
 mod indicator;
 mod potensio;
-
 
 mod app {
     use crate::indicator::Indicator;
@@ -63,7 +62,7 @@ fn main() -> ! {
                 app.periodic_task();
 
                 uart.write_str("hello ");
-                write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
+                write!(uart, "{} + {} = {}\r\n", 2, 4, 2 + 4);
                 write!(uart, "{} \r\n", potensio0.sigle_conversion());
                 cnt = 0;
             }
@@ -71,5 +70,4 @@ fn main() -> ! {
             // hprintln!("next: {}", last_t.wrapping_add(1000)).unwrap();
         }
     }
-
 }

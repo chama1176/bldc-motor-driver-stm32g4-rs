@@ -1,10 +1,9 @@
 use crate::indicator::Indicator;
 use crate::potensio::Potensio;
 
-use stm32g4::stm32g431::Peripherals;
-use cortex_m_semihosting::hprintln;
 use core::fmt::{self, Write};
-
+use cortex_m_semihosting::hprintln;
+use stm32g4::stm32g431::Peripherals;
 
 pub struct Uart0<'a> {
     perip: &'a Peripherals,
@@ -21,7 +20,6 @@ impl<'a> Write for Uart0<'a> {
 
 impl<'a> Uart0<'a> {
     pub fn new(perip: &'a Peripherals) -> Self {
-        
         // GPIOポートの電源投入(クロックの有効化)
         perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
 
@@ -33,7 +31,7 @@ impl<'a> Uart0<'a> {
         gpiob.moder.modify(|_, w| w.moder7().alternate());
         gpiob.afrl.modify(|_, w| w.afrl6().af7());
         gpiob.afrl.modify(|_, w| w.afrl7().af7());
-        
+
         let uart = &perip.USART1;
         // Set over sampling mode
         uart.cr1.modify(|_, w| w.over8().clear_bit());
@@ -44,10 +42,10 @@ impl<'a> Uart0<'a> {
         uart.cr1.modify(|_, w| w.m1().clear_bit());
         // FIFO?
         // Set baud rate
-        uart.brr.modify(|_, w| unsafe{ w.bits(0x4BF) });    // 140MHz / 115200
+        uart.brr.modify(|_, w| unsafe { w.bits(0x4BF) }); // 140MHz / 115200
 
         // Set stop bit
-        uart.cr2.modify(|_, w| unsafe{ w.stop().bits(0b00) });
+        uart.cr2.modify(|_, w| unsafe { w.stop().bits(0b00) });
 
         // Set uart enable
         uart.cr1.modify(|_, w| w.ue().set_bit());
@@ -57,21 +55,17 @@ impl<'a> Uart0<'a> {
         // Set uart transmitter enable
         uart.cr1.modify(|_, w| w.te().set_bit());
 
-
         Self { perip }
     }
     fn putc(&self, c: u8) {
         let uart = &self.perip.USART1;
-        uart.tdr.modify(|_, w| unsafe{ w.tdr().bits(c.into()) });
+        uart.tdr.modify(|_, w| unsafe { w.tdr().bits(c.into()) });
         // while uart.isr.read().tc().bit_is_set() {}
         while uart.isr.read().txe().bit_is_clear() {}
     }
-
 }
 
-    
 pub fn clock_init(perip: &Peripherals) {
-
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
     perip.RCC.cr.modify(|_, w| w.hseon().on());
     while perip.RCC.cr.read().hserdy().is_not_ready() {}
@@ -85,12 +79,15 @@ pub fn clock_init(perip: &Peripherals) {
     // perip.RCC.pllcfgr.modify(|_, w| w.plln().div85());
     perip.RCC.pllcfgr.modify(|_, w| w.plln().div70());
     perip.RCC.pllcfgr.modify(|_, w| w.pllr().div2());
-    
+
     perip.RCC.cr.modify(|_, w| w.pllon().on());
     while perip.RCC.cr.read().pllrdy().is_not_ready() {}
     perip.RCC.pllcfgr.modify(|_, w| w.pllren().set_bit());
 
-    perip.FLASH.acr.modify(|_,w| unsafe { w.latency().bits(4) });
+    perip
+        .FLASH
+        .acr
+        .modify(|_, w| unsafe { w.latency().bits(4) });
     while perip.FLASH.acr.read().latency().bits() != 4 {
         hprintln!("latency bit: {}", perip.FLASH.acr.read().latency().bits()).unwrap();
     }
@@ -105,15 +102,14 @@ pub fn clock_init(perip: &Peripherals) {
     }
     // while !perip.RCC.cfgr.read().sws().is_hse() {}
 
-    perip.RCC.apb1enr1.modify(|_,w| w.tim3en().enabled());
-    
+    perip.RCC.apb1enr1.modify(|_, w| w.tim3en().enabled());
+
     let tim3 = &perip.TIM3;
     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
     tim3.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) });
     // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
-
 }
 
 pub struct Potensio0<'a> {
@@ -132,7 +128,7 @@ impl<'a> Potensio0<'a> {
         perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
 
         perip.RCC.ahb2enr.modify(|_, w| w.adc12en().set_bit());
-        perip.RCC.ccipr.modify(|_, w| w.adc12sel().system());   // clock source setting
+        perip.RCC.ccipr.modify(|_, w| w.adc12sel().system()); // clock source setting
 
         // gpioモード変更
         let gpio = &perip.GPIOA;
@@ -140,28 +136,31 @@ impl<'a> Potensio0<'a> {
         gpio.moder.modify(|_, w| w.moder7().analog());
 
         let adc = &perip.ADC2;
-        adc.cfgr.modify(|_, w| w.res().bits12());   // Resolution setting
-        adc.cfgr.modify(|_, w| w.align().right());   // Data align setting
-        adc.cfgr.modify(|_, w| w.cont().single());   // single or continuous
+        adc.cfgr.modify(|_, w| w.res().bits12()); // Resolution setting
+        adc.cfgr.modify(|_, w| w.align().right()); // Data align setting
+        adc.cfgr.modify(|_, w| w.cont().single()); // single or continuous
 
-        perip.ADC12_COMMON.ccr.modify(|_, w| unsafe{ w.presc().bits(0b0010) }); // Clock prescaler setting
+        perip
+            .ADC12_COMMON
+            .ccr
+            .modify(|_, w| unsafe { w.presc().bits(0b0010) }); // Clock prescaler setting
 
-        adc.cr.modify(|_, w| w.deeppwd().disabled());   // Deep power down setting
-        adc.cr.modify(|_, w| w.advregen().enabled());   // Voltage regulator setting
-        // ADC voltage regulator start-up time 20us
+        adc.cr.modify(|_, w| w.deeppwd().disabled()); // Deep power down setting
+        adc.cr.modify(|_, w| w.advregen().enabled()); // Voltage regulator setting
+                                                      // ADC voltage regulator start-up time 20us
         let mut t = perip.TIM3.cnt.read().cnt().bits();
         let prev = t;
         while t.wrapping_sub(prev) >= 1 {
             t = perip.TIM3.cnt.read().cnt().bits();
         }
 
-        adc.smpr1.modify(|_, w| w.smp3().cycles2_5());   // sampling time selection
-        // adc.smpr1.modify(|_, w| w.smp4().cycles2_5());   // sampling time selection
+        adc.smpr1.modify(|_, w| w.smp3().cycles2_5()); // sampling time selection
+                                                       // adc.smpr1.modify(|_, w| w.smp4().cycles2_5());   // sampling time selection
 
-        adc.sqr1.modify(|_, w| w.l().bits(0));   // Regular channel sequence length. 0 means 1 length
-        adc.sqr1.modify(|_, w| unsafe{ w.sq1().bits(3) });   // 1st conversion in regular sequence
+        adc.sqr1.modify(|_, w| w.l().bits(0)); // Regular channel sequence length. 0 means 1 length
+        adc.sqr1.modify(|_, w| unsafe { w.sq1().bits(3) }); // 1st conversion in regular sequence
 
-        adc.cr.modify(|_, w| w.aden().enable());   // ADC enable control
+        adc.cr.modify(|_, w| w.aden().enable()); // ADC enable control
 
         while adc.isr.read().adrdy().is_not_ready() {
             // Wait for ADC ready
@@ -171,17 +170,15 @@ impl<'a> Potensio0<'a> {
     }
     pub fn sigle_conversion(&self) -> u16 {
         let adc = &self.perip.ADC2;
-        adc.cr.modify(|_, w| w.adstart().start());   // ADC start
+        adc.cr.modify(|_, w| w.adstart().start()); // ADC start
         while adc.isr.read().eoc().is_not_complete() {
             // Wait for ADC complete
         }
-        adc.isr.modify(|_, w| w.eoc().clear());   // clear eoc flag
-        
-        adc.dr.read().rdata().bits() 
+        adc.isr.modify(|_, w| w.eoc().clear()); // clear eoc flag
 
+        adc.dr.read().rdata().bits()
     }
 }
-
 
 pub struct Led0<'a> {
     perip: &'a Peripherals,
@@ -254,4 +251,3 @@ impl<'a> Led1<'a> {
         Self { perip }
     }
 }
-
