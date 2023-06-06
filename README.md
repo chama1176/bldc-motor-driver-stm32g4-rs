@@ -1,4 +1,7 @@
-# `cortex-m-quickstart`
+# IMU and FSR on STM32G4 Board made from `cortex-m-quickstart`
+
+[![Rust](https://github.com/chama1176/imu-fsr-stm32g4-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/chama1176/imu-fsr-stm32g4-rs/actions/workflows/rust.yml)
+
 
 > A template for building applications for ARM Cortex-M microcontrollers
 
