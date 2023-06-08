@@ -21,14 +21,18 @@ mod app {
     pub struct App<'a> {
         led0: &'a dyn Indicator,
         led1: &'a dyn Indicator,
+        led2: &'a dyn Indicator,
     }
 
     impl<'a> App<'a> {
-        pub fn new(led0: &'a dyn Indicator, led1: &'a dyn Indicator) -> Self {
-            Self { led0, led1 }
+        pub fn new(led0: &'a dyn Indicator, led1: &'a dyn Indicator, led2: &'a dyn Indicator) -> Self {
+            led2.on();
+            Self { led0, led1, led2 }
         }
         pub fn periodic_task(&self) {
-            self.led0.toggle();
+            // self.led0.toggle();
+            self.led1.toggle();
+            // self.led2.toggle();
         }
     }
 }
@@ -42,12 +46,13 @@ fn main() -> ! {
     let perip = stm32g431::Peripherals::take().unwrap();
     let led0 = imu_fsr_stm32g4::Led0::new(&perip);
     let led1 = imu_fsr_stm32g4::Led1::new(&perip);
+    let led2 = imu_fsr_stm32g4::Led2::new(&perip);
 
-    let app = app::App::new(&led0, &led1);
+    let app = app::App::new(&led0, &led1, &led2);
     imu_fsr_stm32g4::clock_init(&perip);
-    let mut uart = imu_fsr_stm32g4::Uart0::new(&perip);
+    let mut uart = imu_fsr_stm32g4::Uart3::new(&perip);
 
-    let potensio0 = imu_fsr_stm32g4::Potensio0::new(&perip);
+    // let potensio0 = imu_fsr_stm32g4::Potensio0::new(&perip);
 
     let mut t = perip.TIM3.cnt.read().cnt().bits();
     let mut prev = t;
@@ -55,7 +60,7 @@ fn main() -> ! {
     let mut cnt = 0;
     loop {
         t = perip.TIM3.cnt.read().cnt().bits();
-        if t.wrapping_sub(prev) > 10000 {
+        if t.wrapping_sub(prev) > 5000 {
             cnt += 1;
             // hprintln!("t: {}", t).unwrap();
             if cnt > 0 {
@@ -63,7 +68,7 @@ fn main() -> ! {
 
                 uart.write_str("hello ");
                 write!(uart, "{} + {} = {}\r\n", 2, 4, 2 + 4);
-                write!(uart, "{} \r\n", potensio0.sigle_conversion());
+                // write!(uart, "{} \r\n", potensio0.sigle_conversion());
                 cnt = 0;
             }
             prev = t;
