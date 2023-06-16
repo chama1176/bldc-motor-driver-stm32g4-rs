@@ -158,8 +158,6 @@ pub fn clock_init(perip: &Peripherals) {
     while perip.FLASH.acr.read().latency().bits() != 4 {
         hprintln!("latency bit: {}", perip.FLASH.acr.read().latency().bits()).unwrap();
     }
-    // Switch boot configuration. Use nBOOT0 for boot configuration.
-    perip.FLASH.optr.modify(|_, w| w.n_swboot0().clear_bit());
 
     perip.RCC.cfgr.modify(|_, w| w.sw().pll());
     // perip.RCC.cfgr.modify(|_, w| w.sw().hse());
