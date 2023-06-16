@@ -19,6 +19,6 @@ jobs:
     - name: Install
       run: rustup target add thumbv7em-none-eabihf
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: Run tests
       run: cargo test --verbose
