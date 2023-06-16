@@ -137,6 +137,15 @@ to intervene to uphold that code of conduct.
 [CoC]: https://www.rust-lang.org/policies/code-of-conduct
 [team]: https://github.com/rust-embedded/wg#the-cortex-m-team
 
+## Setup
+Set flash regiseter like this from STM32CubeProgrammer.
+Code below is currently not working for me.
+```
+// Switch boot configuration. Use nBOOT0 for boot configuration.
+perip.FLASH.optr.modify(|_, w| w.n_swboot0().clear_bit());
+perip.FLASH.optr.modify(|_, w| w.n_boot0().set_bit());
+```
+
 ## How to Run 
 
 Run command below.
