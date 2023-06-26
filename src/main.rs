@@ -11,18 +11,18 @@ use core::fmt::Write;
 use cortex_m_rt::entry;
 use cortex_m_semihosting::hprintln;
 
-mod fsr;
-mod imu_fsr_stm32g4;
+mod bldc_motor_driver_stspin32g4;
 mod indicator;
-mod potensio;
 
 mod app {
     use crate::indicator::Indicator;
+    use crate::bldc_motor_driver_stspin32g4::BldcPwm;   // 👺
 
     pub struct App<'a> {
         led0: &'a dyn Indicator,
         led1: &'a dyn Indicator,
         led2: &'a dyn Indicator,
+        bldc: &'a BldcPwm<'a>,
     }
 
     impl<'a> App<'a> {
@@ -30,13 +30,23 @@ mod app {
             led0: &'a dyn Indicator,
             led1: &'a dyn Indicator,
             led2: &'a dyn Indicator,
+            bldc: &'a BldcPwm<'a>,
         ) -> Self {
-            Self { led0, led1, led2 }
+            led1.on();
+            Self { led0, led1, led2, bldc }
         }
         pub fn periodic_task(&self) {
-            self.led0.toggle();
-            self.led1.toggle();
             self.led2.toggle();
+            // if self.bldc.get_nfault_status() {
+            //     self.led0.on();
+            // } else {
+            //     self.led0.off(); // not fault
+            // }
+            // if self.bldc.get_ready_status() {
+            //     self.led1.on();
+            // } else {
+            //     self.led1.off(); // ready
+            // }
         }
     }
 }
@@ -51,33 +61,29 @@ fn main() -> ! {
     // stm32f401モジュールより、ペリフェラルの入り口となるオブジェクトを取得する。
     let perip = stm32g431::Peripherals::take().unwrap();
     let mut core_perip = stm32g431::CorePeripherals::take().unwrap();
-    let led0 = imu_fsr_stm32g4::Led0::new(&perip);
-    let led1 = imu_fsr_stm32g4::Led1::new(&perip);
-    let led2 = imu_fsr_stm32g4::Led2::new(&perip);
+    let led0 = bldc_motor_driver_stspin32g4::Led0::new(&perip);
+    let led1 = bldc_motor_driver_stspin32g4::Led1::new(&perip);
+    let led2 = bldc_motor_driver_stspin32g4::Led2::new(&perip);
 
-    let app = app::App::new(&led0, &led1, &led2);
-    imu_fsr_stm32g4::clock_init(&perip);
-    imu_fsr_stm32g4::adc2_init(&perip);
+    bldc_motor_driver_stspin32g4::clock_init(&perip);
 
-    let adc_data: [u16; 4] = [7; 4];
+    let mut uart = bldc_motor_driver_stspin32g4::Uart1::new(&perip);
+    let pwm = bldc_motor_driver_stspin32g4::BldcPwm::new(&perip);
+    pwm.set_pwm(500);
+    bldc_motor_driver_stspin32g4::adc2_init(&perip);
+    let adc_data: [u16; 7] = [77; 7];
     let dma_buf_addr: u32 = adc_data.as_ptr() as u32;
-    imu_fsr_stm32g4::dma_init(&perip, &mut core_perip, dma_buf_addr);
-    let mut uart = imu_fsr_stm32g4::Uart3::new(&perip);
-    imu_fsr_stm32g4::dma_adc2_start(&perip);
-
-    // let potensio0 = imu_fsr_stm32g4::Potensio0::new(&perip);
+    bldc_motor_driver_stspin32g4::dma_init(&perip, &mut core_perip, dma_buf_addr);
+    bldc_motor_driver_stspin32g4::dma_adc2_start(&perip);
+    let app = app::App::new(&led0, &led1, &led2, &pwm);
 
     let mut t = perip.TIM3.cnt.read().cnt().bits();
     let mut prev = t;
-    // hprintln!("t: {}", t).unwrap();
+
     let mut cnt = 0;
-    let mut adc_data_fir: [u16; 4] = [0; 4];
     loop {
-        t = perip.TIM3.cnt.read().cnt().bits();
+        t = perip.TIM3.cnt.read().cnt().bits(); // 0.1ms
         if t.wrapping_sub(prev) > 50 {
-            for i in 0..4 {
-                adc_data_fir[i] = (adc_data_fir[i] as f32 * 0.9 + adc_data[i] as f32 * 0.1) as u16;
-            }
             cnt += 1;
             // hprintln!("t: {}", t).unwrap();
             if cnt > 100 {
@@ -89,7 +95,7 @@ fn main() -> ! {
                     write!(
                         uart,
                         "{{\"FSR\":[{}, {}, {}, {}]}}\r\n",
-                        adc_data_fir[3], adc_data_fir[0], adc_data_fir[1], adc_data_fir[2]
+                        adc_data[3], adc_data[0], adc_data[1], adc_data[2]
                     );
                 }
                 // write!(uart, "{} \r\n", potensio0.sigle_conversion());
