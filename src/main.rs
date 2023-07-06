@@ -69,7 +69,9 @@ fn main() -> ! {
 
     let mut uart = bldc_motor_driver_stspin32g4::Uart1::new(&perip);
     let pwm = bldc_motor_driver_stspin32g4::BldcPwm::new(&perip);
-    pwm.set_pwm(500);
+    pwm.set_u_pwm(600);
+    pwm.set_v_pwm(600);
+    pwm.set_w_pwm(600);
     bldc_motor_driver_stspin32g4::adc2_init(&perip);
     let adc_data: [u16; 7] = [77; 7];
     let dma_buf_addr: u32 = adc_data.as_ptr() as u32;

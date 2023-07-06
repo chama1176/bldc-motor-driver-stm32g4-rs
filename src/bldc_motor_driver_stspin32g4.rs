@@ -1,5 +1,6 @@
 use crate::indicator::Indicator;
 
+use cortex_m::register;
 use stm32g4::stm32g431::CorePeripherals;
 use stm32g4::stm32g431::Interrupt;
 use stm32g4::stm32g431::Peripherals;
@@ -105,12 +106,12 @@ impl<'a> BldcPwm<'a> {
         gpio.afrh.modify(|_, w| w.afrh11().af2());
         gpio.afrh.modify(|_, w| w.afrh12().af2());
         gpio.afrh.modify(|_, w| w.afrh13().af2());
-        // gpio.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
-        // gpio.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
-        // gpio.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
-        // gpio.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
-        // gpio.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
-        // gpio.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+        gpio.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+        gpio.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+        gpio.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+        gpio.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
+        gpio.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+        gpio.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
 
         perip.RCC.ccipr.modify(|_, w| w.i2c3sel().pclk());
         perip.RCC.apb1enr1.modify(|_, w| w.i2c3en().enabled());
@@ -133,7 +134,6 @@ impl<'a> BldcPwm<'a> {
         // Peripheral enable
         i2c.cr1.modify(|_, w| w.pe().set_bit() );
 
-
         // For PWM
         let tim = &perip.TIM1;
         tim.psc.modify(|_, w| unsafe { w.bits(7 - 1) });
@@ -142,8 +142,12 @@ impl<'a> BldcPwm<'a> {
 
         // OCxM mode
         tim.ccmr1_output().modify(|_, w| w.oc1m().pwm_mode1());
+        tim.ccmr1_output().modify(|_, w| w.oc2m().pwm_mode1());
+        tim.ccmr2_output().modify(|_, w| w.oc3m().pwm_mode1());
         // CCRx
-        tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(400) });   // 100/800
+        tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(0) });   // x/800
+        tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(0) });   // x/800
+        tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(0) });   // x/800
         // CCxIE enable interrupt request
 
         // Set polarity
@@ -154,6 +158,10 @@ impl<'a> BldcPwm<'a> {
         // CCxE enable output
         tim.ccer.modify(|_, w| w.cc1e().set_bit());
         tim.ccer.modify(|_, w| w.cc1ne().set_bit());
+        tim.ccer.modify(|_, w| w.cc2e().set_bit());
+        tim.ccer.modify(|_, w| w.cc2ne().set_bit());
+        tim.ccer.modify(|_, w| w.cc3e().set_bit());
+        tim.ccer.modify(|_, w| w.cc3ne().set_bit());
         // enable tim
         tim.cr1.modify(|_, w| w.cen().set_bit());
         // BDTR break and dead-time register
@@ -162,136 +170,14 @@ impl<'a> BldcPwm<'a> {
         // Wait for ready
         while gpio.idr.read().idr14().is_low() && gpio.idr.read().idr15().is_high() {}
 
-
-
-
-        i2c.cr2.modify(|_, w| w.nbytes().bits(2) );
-        // Address
-        i2c.cr2.modify(|_, w| w.sadd().bits(0x47 << 1) );   // 1000111
-        i2c.cr2.modify(|_, w| w.add10().bit7());
-        // Transfer direction
-        i2c.cr2.modify(|_, w| w.rd_wrn().write() );
-        i2c.cr2.modify(|_, w| w.autoend().clear_bit() );
-        i2c.cr2.modify(|_, w| w.reload().clear_bit() );
-        while i2c.cr2.read().start().bit_is_set() {}
-        i2c.cr2.modify(|_, w| w.start().set_bit() );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x0B) );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x0F) );
-
-        while i2c.isr.read().tc().bit_is_clear() {
-            // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-            // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
-        }
-        i2c.cr2.modify(|_, w| w.stop().stop() );
-
-
-
-
-        i2c.cr2.modify(|_, w| w.nbytes().bits(2) );
-        // Address
-        i2c.cr2.modify(|_, w| w.sadd().bits(0x47 << 1) );   // 1000111
-        i2c.cr2.modify(|_, w| w.add10().bit7());
-        // Transfer direction
-        i2c.cr2.modify(|_, w| w.rd_wrn().write() );
-        i2c.cr2.modify(|_, w| w.autoend().clear_bit() );
-        i2c.cr2.modify(|_, w| w.reload().clear_bit() );
-        while i2c.cr2.read().start().bit_is_set() {}
-        i2c.cr2.modify(|_, w| w.start().set_bit() );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x01) );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x01) );
-
-        while i2c.isr.read().tc().bit_is_clear() {
-            // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-            // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
-        }
-        i2c.cr2.modify(|_, w| w.stop().stop() );
-
-
-
-        i2c.cr2.modify(|_, w| w.nbytes().bits(2) );
-        // Address
-        i2c.cr2.modify(|_, w| w.sadd().bits(0x47 << 1) );   // 1000111
-        i2c.cr2.modify(|_, w| w.add10().bit7());
-        // Transfer direction
-        i2c.cr2.modify(|_, w| w.rd_wrn().write() );
-        i2c.cr2.modify(|_, w| w.autoend().clear_bit() );
-        i2c.cr2.modify(|_, w| w.reload().clear_bit() );
-        while i2c.cr2.read().start().bit_is_set() {}
-        i2c.cr2.modify(|_, w| w.start().set_bit() );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x0B) );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x00) );
-
-        while i2c.isr.read().tc().bit_is_clear() {
-            // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-            // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
-        }
-        i2c.cr2.modify(|_, w| w.stop().stop() );
-
-
-
-
-        i2c.cr2.modify(|_, w| w.nbytes().bits(2) );
-        // Address
-        i2c.cr2.modify(|_, w| w.sadd().bits(0x47 << 1) );   // 1000111
-        i2c.cr2.modify(|_, w| w.add10().bit7());
-        // Transfer direction
-        i2c.cr2.modify(|_, w| w.rd_wrn().write() );
-        i2c.cr2.modify(|_, w| w.autoend().clear_bit() );
-        i2c.cr2.modify(|_, w| w.reload().clear_bit() );
-        while i2c.cr2.read().start().bit_is_set() {}
-        i2c.cr2.modify(|_, w| w.start().set_bit() );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0x09) );
-        while i2c.isr.read().txis().bit_is_clear() {
-            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-        }
-        i2c.txdr.modify(|_, w| w.txdata().bits(0xFF) );
-
-        while i2c.isr.read().tc().bit_is_clear() {
-            // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-            // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
-        }
-        i2c.cr2.modify(|_, w| w.stop().stop() );
-
-
-
-
+        // Unlock protected register.
+        Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x0F]);
+        // Set gate drive voltage
+        Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x01]);
+        // Lock protected register.
+        Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x00]);
+        // Clear Fault.
+        Self::write_2byte_i2c(&perip, 0x47, &[0x09, 0xFF]);
 
         // Wake up
         gpio.bsrr.write(|w| w.bs7().set());
@@ -299,9 +185,17 @@ impl<'a> BldcPwm<'a> {
 
         Self { perip }
     }
-    pub fn set_pwm(&self, p: u32){
+    pub fn set_u_pwm(&self, p: u32){
         let tim = &self.perip.TIM1;
-        tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) });   // 100/800
+        tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) });   // x/800
+    }
+    pub fn set_v_pwm(&self, p: u32){
+        let tim = &self.perip.TIM1;
+        tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(p) });   // x/800
+    }
+    pub fn set_w_pwm(&self, p: u32){
+        let tim = &self.perip.TIM1;
+        tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(p) });   // x/800
     }
     pub fn get_nfault_status(&self)->bool{
         let gpio = &self.perip.GPIOE;
@@ -310,6 +204,45 @@ impl<'a> BldcPwm<'a> {
     pub fn get_ready_status(&self)->bool{
         let gpio = &self.perip.GPIOE;
         gpio.idr.read().idr14().is_high()
+    }
+    /// Write 'data' to 'address's slave
+    fn write_2byte_i2c(perip: & Peripherals, address: u16, data: &[u8]){
+
+        if data.len() != 2 {
+            return;
+        }
+
+        let i2c = &perip.I2C3;
+
+        i2c.cr2.modify(|_, w| w.nbytes().bits(2) );
+        // Address
+        i2c.cr2.modify(|_, w| w.sadd().bits(address << 1) );   // 1000111
+        i2c.cr2.modify(|_, w| w.add10().bit7());
+        // Transfer direction
+        i2c.cr2.modify(|_, w| w.rd_wrn().write() );
+        i2c.cr2.modify(|_, w| w.autoend().clear_bit() );
+        i2c.cr2.modify(|_, w| w.reload().clear_bit() );
+        while i2c.cr2.read().start().bit_is_set() {}
+        i2c.cr2.modify(|_, w| w.start().set_bit() );
+        while i2c.isr.read().txis().bit_is_clear() {
+            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
+            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
+            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+        }
+        i2c.txdr.modify(|_, w| w.txdata().bits(data[0]) );
+        while i2c.isr.read().txis().bit_is_clear() {
+            // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
+            // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
+            // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+        }
+        i2c.txdr.modify(|_, w| w.txdata().bits(data[1]) );
+
+        while i2c.isr.read().tc().bit_is_clear() {
+            // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
+            // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
+        }
+        i2c.cr2.modify(|_, w| w.stop().stop() );
+
     }
 }
 
