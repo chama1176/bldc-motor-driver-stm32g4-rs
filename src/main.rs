@@ -91,8 +91,8 @@ fn main() -> ! {
             if cnt > 100 {
                 app.periodic_task();
 
-                // uart.write_str("hello ");
-                // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
+                uart.write_str("hello ");
+                write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 unsafe {
                     write!(
                         uart,

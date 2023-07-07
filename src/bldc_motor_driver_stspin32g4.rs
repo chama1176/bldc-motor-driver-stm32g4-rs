@@ -24,7 +24,7 @@ impl<'a> Write for Uart1<'a> {
 impl<'a> Uart1<'a> {
     pub fn new(perip: &'a Peripherals) -> Self {
         // GPIOポートの電源投入(クロックの有効化)
-        perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
+        perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
 
         perip.RCC.apb2enr.modify(|_, w| w.usart1en().enabled());
 
