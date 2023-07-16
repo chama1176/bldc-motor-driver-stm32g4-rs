@@ -354,7 +354,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals, address: 
         .cpar1
         .modify(|_, w| unsafe { w.pa().bits(adc_data_register_addr) }); // peripheral address
                                                                         // perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(adc_dma_buf.len() as u16) }); // num
-    perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(4) }); // num
+    perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(7) }); // num
                                                                  // perip.DMA1.cmar1.modify(|_, w| unsafe { w.ma().bits(adc_dma_buf_addr) });      // memory address
     perip
         .DMA1
@@ -405,6 +405,7 @@ pub fn adc2_init(perip: &Peripherals) {
                                                  // 1周は実行したいが，常に変換しつづけるのは困る
     adc.cfgr.modify(|_, w| w.extsel().tim6_trgo()); // dma enable
     adc.cfgr.modify(|_, w| w.exten().rising_edge()); // dma enable
+    adc.cfgr2.modify(|_, w| w.rovse().enabled()); // over sampling enable
 
     perip
         .ADC12_COMMON

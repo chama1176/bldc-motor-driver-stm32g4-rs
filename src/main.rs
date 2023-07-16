@@ -32,21 +32,10 @@ mod app {
             led2: &'a dyn Indicator,
             bldc: &'a BldcPwm<'a>,
         ) -> Self {
-            led1.on();
             Self { led0, led1, led2, bldc }
         }
         pub fn periodic_task(&self) {
             self.led2.toggle();
-            // if self.bldc.get_nfault_status() {
-            //     self.led0.on();
-            // } else {
-            //     self.led0.off(); // not fault
-            // }
-            // if self.bldc.get_ready_status() {
-            //     self.led1.on();
-            // } else {
-            //     self.led1.off(); // ready
-            // }
         }
     }
 }
@@ -96,8 +85,8 @@ fn main() -> ! {
                 unsafe {
                     write!(
                         uart,
-                        "{{\"FSR\":[{}, {}, {}, {}]}}\r\n",
-                        adc_data[3], adc_data[0], adc_data[1], adc_data[2]
+                        "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
+                        adc_data[0], adc_data[1], adc_data[2], adc_data[3], adc_data[4], adc_data[5], adc_data[6]
                     );
                 }
                 // write!(uart, "{} \r\n", potensio0.sigle_conversion());
