@@ -249,7 +249,7 @@ impl<'a> BldcPwm<'a> {
 
 
 
-pub fn clock_init(perip: &Peripherals) {
+pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
     perip.RCC.cr.modify(|_, w| w.hseon().on());
     while perip.RCC.cr.read().hserdy().is_not_ready() {}
@@ -294,9 +294,14 @@ pub fn clock_init(perip: &Peripherals) {
     let tim3 = &perip.TIM3;
     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
     tim3.psc.modify(|_, w| unsafe { w.bits(14_000 - 1) });
-    // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });
+    tim3.arr.modify(|_, w| unsafe { w.bits(10000 - 1) });
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
+
+    unsafe{
+        core_perip.NVIC.set_priority(Interrupt::TIM3, 0);
+        NVIC::unmask(Interrupt::TIM3);
+    }
 
     // For ADC
     let tim6 = &perip.TIM6;

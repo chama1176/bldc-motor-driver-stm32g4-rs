@@ -2,14 +2,19 @@
 #![no_main]
 
 // pick a panicking behavior
-use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
+use panic_halt as _;
+use stm32g4::stm32g431; // you can put a breakpoint on `rust_begin_unwind` to catch panics
                      // use panic_abort as _; // requires nightly
                      // use panic_itm as _; // logs messages over ITM; requires ITM support
                      // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
 use core::fmt::Write;
 use cortex_m_rt::entry;
+use cortex_m::interrupt::{free, Mutex};
 use cortex_m_semihosting::hprintln;
+
+use stm32g4::stm32g431::interrupt;
+use stm32g4::stm32g431::Interrupt::TIM3;
 
 mod bldc_motor_driver_stspin32g4;
 mod indicator;
@@ -42,6 +47,19 @@ mod app {
 
 // static adc_data:[u16; 4] = [7; 4];
 
+#[interrupt]
+fn TIM3() {
+    free(|cs| {
+        unsafe {
+            let device = stm32g431::Peripherals::steal();
+            device.TIM3.sr.modify(|_,w| w.uif().clear_bit());
+        }
+    });
+    hprintln!("test!").unwrap();
+}
+
+
+
 #[entry]
 fn main() -> ! {
     use stm32g4::stm32g431;
@@ -54,7 +72,7 @@ fn main() -> ! {
     let led1 = bldc_motor_driver_stspin32g4::Led1::new(&perip);
     let led2 = bldc_motor_driver_stspin32g4::Led2::new(&perip);
 
-    bldc_motor_driver_stspin32g4::clock_init(&perip);
+    bldc_motor_driver_stspin32g4::clock_init(&perip, &mut core_perip);
 
     let mut uart = bldc_motor_driver_stspin32g4::Uart1::new(&perip);
     let pwm = bldc_motor_driver_stspin32g4::BldcPwm::new(&perip);
@@ -74,11 +92,13 @@ fn main() -> ! {
     let mut cnt = 0;
     loop {
         t = perip.TIM3.cnt.read().cnt().bits(); // 0.1ms
-        if t.wrapping_sub(prev) > 50 {
+        // if t.wrapping_sub(prev) > 50 {
+        if (t+10000-prev)%10000 >= 5000 {
             cnt += 1;
             // hprintln!("t: {}", t).unwrap();
+            app.periodic_task();
             if cnt > 100 {
-                app.periodic_task();
+                // app.periodic_task();
 
                 uart.write_str("hello ");
                 write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
