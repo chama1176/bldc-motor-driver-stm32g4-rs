@@ -15,34 +15,24 @@ mod bldc_motor_driver_stspin32g4;
 mod indicator;
 
 mod app {
-    use crate::bldc_motor_driver_stspin32g4::BldcPwm;
-    use crate::indicator::Indicator; // 👺
+    use crate::indicator::Indicator;
+    use crate::bldc_motor_driver_stspin32g4::BldcPwm;   // 👺
 
-    pub struct App<'a, T0, T1, T2>
-    where
-        T0: Indicator,
-        T1: Indicator,
-        T2: Indicator,
-    {
-        led0: &'a T0,
-        led1: &'a T1,
-        led2: &'a T2,
+    pub struct App<'a> {
+        led0: &'a dyn Indicator,
+        led1: &'a dyn Indicator,
+        led2: &'a dyn Indicator,
         bldc: &'a BldcPwm<'a>,
     }
 
-    impl<'a, T0, T1, T2> App<'a, T0, T1, T2>
-    where
-        T0: Indicator,
-        T1: Indicator,
-        T2: Indicator,
-    {
-        pub fn new(led0: &'a T0, led1: &'a T1, led2: &'a T2, bldc: &'a BldcPwm<'a>) -> Self {
-            Self {
-                led0,
-                led1,
-                led2,
-                bldc,
-            }
+    impl<'a> App<'a> {
+        pub fn new(
+            led0: &'a dyn Indicator,
+            led1: &'a dyn Indicator,
+            led2: &'a dyn Indicator,
+            bldc: &'a BldcPwm<'a>,
+        ) -> Self {
+            Self { led0, led1, led2, bldc }
         }
         pub fn periodic_task(&self) {
             self.led2.toggle();
@@ -91,18 +81,12 @@ fn main() -> ! {
                 app.periodic_task();
 
                 uart.write_str("hello ");
-                write!(uart, "{} + {} = {}\r\n", 2, 4, 2 + 4);
+                write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 unsafe {
                     write!(
                         uart,
                         "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
-                        adc_data[0],
-                        adc_data[1],
-                        adc_data[2],
-                        adc_data[3],
-                        adc_data[4],
-                        adc_data[5],
-                        adc_data[6]
+                        adc_data[0], adc_data[1], adc_data[2], adc_data[3], adc_data[4], adc_data[5], adc_data[6]
                     );
                 }
                 // write!(uart, "{} \r\n", potensio0.sigle_conversion());
