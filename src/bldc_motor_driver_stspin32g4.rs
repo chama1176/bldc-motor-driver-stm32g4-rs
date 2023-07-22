@@ -14,241 +14,6 @@ use stm32g4::stm32g431::NVIC;
 
 use crate::indicator::Indicator;
 
-// pub struct Uart1<'a> {
-//     perip: &'a Peripherals,
-// }
-// impl<'a> Write for Uart1<'a> {
-//     fn write_str(&mut self, s: &str) -> fmt::Result {
-//         for c in s.bytes() {
-//             self.putc(c);
-//         }
-//         Ok(())
-//     }
-// }
-// impl<'a> Uart1<'a> {
-//     pub fn new(perip: &'a Peripherals) -> Self {
-//         // GPIOポートの電源投入(クロックの有効化)
-//         perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
-
-//         perip.RCC.apb2enr.modify(|_, w| w.usart1en().enabled());
-
-//         // gpioモード変更
-//         let gpioc = &perip.GPIOC;
-//         gpioc.moder.modify(|_, w| w.moder4().alternate());
-//         gpioc.moder.modify(|_, w| w.moder5().alternate());
-//         gpioc.afrl.modify(|_, w| w.afrl4().af7());
-//         gpioc.afrl.modify(|_, w| w.afrl5().af7());
-
-//         let uart = &perip.USART1;
-//         // Set over sampling mode
-//         uart.cr1.modify(|_, w| w.over8().clear_bit());
-//         // Set parity mode
-//         uart.cr1.modify(|_, w| w.pce().clear_bit());
-//         // Set word length
-//         uart.cr1.modify(|_, w| w.m0().clear_bit());
-//         uart.cr1.modify(|_, w| w.m1().clear_bit());
-//         // FIFO?
-//         // Set baud rate
-//         uart.brr.modify(|_, w| unsafe { w.bits(0x4BF) }); // 140MHz / 115200
-
-//         // Set stop bit
-//         uart.cr2.modify(|_, w| unsafe { w.stop().bits(0b00) });
-
-//         // Set uart enable
-//         uart.cr1.modify(|_, w| w.ue().set_bit());
-
-//         // Set uart recieve enable
-//         uart.cr1.modify(|_, w| w.re().set_bit());
-//         // Set uart transmitter enable
-//         uart.cr1.modify(|_, w| w.te().set_bit());
-
-//         Self { perip }
-//     }
-//     fn putc(&self, c: u8) {
-//         let uart = &self.perip.USART1;
-//         uart.tdr.modify(|_, w| unsafe { w.tdr().bits(c.into()) });
-//         // while uart.isr.read().tc().bit_is_set() {}
-//         while uart.isr.read().txe().bit_is_clear() {}
-//     }
-// }
-
-// pub struct BldcPwm<'a> {
-//     perip: &'a Peripherals,
-// }
-// impl<'a> BldcPwm<'a> {
-//     pub fn new(perip: &'a Peripherals) -> Self {
-//         // GPIOポートの電源投入(クロックの有効化)
-//         perip.RCC.ahb2enr.modify(|_, w| w.gpioeen().set_bit());
-//         perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
-
-//         // gpioモード変更
-//         // I2C
-//         let gpioc = &perip.GPIOC;
-//         gpioc.otyper.modify(|_, w| w.ot8().open_drain());
-//         gpioc.otyper.modify(|_, w| w.ot9().open_drain());
-//         gpioc.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
-//         gpioc.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
-//         gpioc.moder.modify(|_, w| w.moder8().alternate());
-//         gpioc.moder.modify(|_, w| w.moder9().alternate());
-//         gpioc.afrh.modify(|_, w| w.afrh8().af8());
-//         gpioc.afrh.modify(|_, w| w.afrh9().af8());
-//         // IO pin
-//         let gpio = &perip.GPIOE;
-//         gpio.moder.modify(|_, w| w.moder7().output());
-//         gpio.moder.modify(|_, w| w.moder14().input());
-//         gpio.moder.modify(|_, w| w.moder15().input());
-//         // PWM pin
-//         gpio.moder.modify(|_, w| w.moder8().alternate());
-//         gpio.moder.modify(|_, w| w.moder9().alternate());
-//         gpio.moder.modify(|_, w| w.moder10().alternate());
-//         gpio.moder.modify(|_, w| w.moder11().alternate());
-//         gpio.moder.modify(|_, w| w.moder12().alternate());
-//         gpio.moder.modify(|_, w| w.moder13().alternate());
-//         gpio.afrh.modify(|_, w| w.afrh8().af2());
-//         gpio.afrh.modify(|_, w| w.afrh9().af2());
-//         gpio.afrh.modify(|_, w| w.afrh10().af2());
-//         gpio.afrh.modify(|_, w| w.afrh11().af2());
-//         gpio.afrh.modify(|_, w| w.afrh12().af2());
-//         gpio.afrh.modify(|_, w| w.afrh13().af2());
-//         gpio.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
-//         gpio.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
-//         gpio.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
-//         gpio.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
-//         gpio.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
-//         gpio.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
-
-//         perip.RCC.ccipr.modify(|_, w| w.i2c3sel().pclk());
-//         perip.RCC.apb1enr1.modify(|_, w| w.i2c3en().enabled());
-//         perip.RCC.apb2enr.modify(|_, w| w.tim1en().enabled());
-
-//         let i2c = &perip.I2C3;
-//         i2c.cr1.modify(|_, w| w.pe().clear_bit() );
-
-//         i2c.cr1.modify(|_, w| w.anfoff().disabled() );
-//         i2c.cr1.modify(|_, w| w.dnf().no_filter() );
-//         // 140MHz, presc:14-1->10MHz, t=100ns
-//         i2c.timingr.modify(|_, w| w.presc().bits(14-1) );
-//         i2c.timingr.modify(|_, w| w.scll().bits(50-1) ); // t_SCLL 5000ns
-//         i2c.timingr.modify(|_, w| w.sclh().bits(40-1) ); // t_SCLH 4000ns
-//         i2c.timingr.modify(|_, w| w.sdadel().bits(5) ); // 500ns
-//         i2c.timingr.modify(|_, w| w.scldel().bits(12-1) );   // 1200ns
-
-//         i2c.cr1.modify(|_, w| w.nostretch().disabled() );
-
-//         // Peripheral enable
-//         i2c.cr1.modify(|_, w| w.pe().set_bit() );
-
-//         // For PWM
-//         let tim = &perip.TIM1;
-//         tim.psc.modify(|_, w| unsafe { w.bits(7 - 1) });
-//         tim.arr.modify(|_, w| unsafe { w.bits(800 - 1) });   // 25kHz
-//         // tim.dier.modify(|_, w| w.uie().set_bit());
-
-//         // OCxM mode
-//         tim.ccmr1_output().modify(|_, w| w.oc1m().pwm_mode1());
-//         tim.ccmr1_output().modify(|_, w| w.oc2m().pwm_mode1());
-//         tim.ccmr2_output().modify(|_, w| w.oc3m().pwm_mode1());
-//         // CCRx
-//         tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(0) });   // x/800
-//         tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(0) });   // x/800
-//         tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(0) });   // x/800
-//         // CCxIE enable interrupt request
-
-//         // Set polarity
-//         // tim.ccer.modify(|_, w| w.cc1p().clear_bit());
-//         // tim.ccer.modify(|_, w| w.cc1np().clear_bit());
-//         // PWM mode
-//         // tim.cr1.modify(|_, w| unsafe { w.cms().bits(0b00) });
-//         // CCxE enable output
-//         tim.ccer.modify(|_, w| w.cc1e().set_bit());
-//         tim.ccer.modify(|_, w| w.cc1ne().set_bit());
-//         tim.ccer.modify(|_, w| w.cc2e().set_bit());
-//         tim.ccer.modify(|_, w| w.cc2ne().set_bit());
-//         tim.ccer.modify(|_, w| w.cc3e().set_bit());
-//         tim.ccer.modify(|_, w| w.cc3ne().set_bit());
-//         // enable tim
-//         tim.cr1.modify(|_, w| w.cen().set_bit());
-//         // BDTR break and dead-time register
-//         tim.bdtr.modify(|_, w| w.moe().set_bit());
-
-//         // Wait for ready
-//         while gpio.idr.read().idr14().is_low() && gpio.idr.read().idr15().is_high() {}
-
-//         // Unlock protected register.
-//         Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x0F]);
-//         // Set gate drive voltage
-//         Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x01]);
-//         // Lock protected register.
-//         Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x00]);
-//         // Clear Fault.
-//         Self::write_2byte_i2c(&perip, 0x47, &[0x09, 0xFF]);
-
-//         // Wake up
-//         gpio.bsrr.write(|w| w.bs7().set());
-
-//         Self { perip }
-//     }
-//     pub fn set_u_pwm(&self, p: u32){
-//         let tim = &self.perip.TIM1;
-//         tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) });   // x/800
-//     }
-//     pub fn set_v_pwm(&self, p: u32){
-//         let tim = &self.perip.TIM1;
-//         tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(p) });   // x/800
-//     }
-//     pub fn set_w_pwm(&self, p: u32){
-//         let tim = &self.perip.TIM1;
-//         tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(p) });   // x/800
-//     }
-//     pub fn get_nfault_status(&self)->bool{
-//         let gpio = &self.perip.GPIOE;
-//         gpio.idr.read().idr15().is_high()
-//     }
-//     pub fn get_ready_status(&self)->bool{
-//         let gpio = &self.perip.GPIOE;
-//         gpio.idr.read().idr14().is_high()
-//     }
-//     /// Write 'data' to 'address's slave
-//     fn write_2byte_i2c(perip: & Peripherals, address: u16, data: &[u8]){
-
-//         if data.len() != 2 {
-//             return;
-//         }
-
-//         let i2c = &perip.I2C3;
-
-//         i2c.cr2.modify(|_, w| w.nbytes().bits(2) );
-//         // Address
-//         i2c.cr2.modify(|_, w| w.sadd().bits(address << 1) );   // 1000111
-//         i2c.cr2.modify(|_, w| w.add10().bit7());
-//         // Transfer direction
-//         i2c.cr2.modify(|_, w| w.rd_wrn().write() );
-//         i2c.cr2.modify(|_, w| w.autoend().clear_bit() );
-//         i2c.cr2.modify(|_, w| w.reload().clear_bit() );
-//         while i2c.cr2.read().start().bit_is_set() {}
-//         i2c.cr2.modify(|_, w| w.start().set_bit() );
-//         while i2c.isr.read().txis().bit_is_clear() {
-//             // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-//             // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-//             // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-//         }
-//         i2c.txdr.modify(|_, w| w.txdata().bits(data[0]) );
-//         while i2c.isr.read().txis().bit_is_clear() {
-//             // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-//             // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-//             // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-//         }
-//         i2c.txdr.modify(|_, w| w.txdata().bits(data[1]) );
-
-//         while i2c.isr.read().tc().bit_is_clear() {
-//             // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-//             // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
-//         }
-//         i2c.cr2.modify(|_, w| w.stop().stop() );
-
-//     }
-// }
-
 pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
     perip.RCC.cr.modify(|_, w| w.hseon().on());
@@ -293,8 +58,8 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // For main task
     let tim3 = &perip.TIM3;
     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
-    tim3.psc.modify(|_, w| unsafe { w.bits(14_000 - 1) });
-    tim3.arr.modify(|_, w| unsafe { w.bits(10000 - 1) });
+    tim3.psc.modify(|_, w| unsafe { w.bits(14 - 1) });
+    tim3.arr.modify(|_, w| unsafe { w.bits(10_000 - 1) }); // 1kHz
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
@@ -476,6 +241,286 @@ pub fn init_g_peripheral(perip: Peripherals) {
     free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
 }
 
+pub struct Uart1 {}
+impl<'a> Write for Uart1 {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.bytes() {
+            self.putc(c);
+        }
+        Ok(())
+    }
+}
+impl<'a> Uart1 {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                // GPIOポートの電源投入(クロックの有効化)
+                perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+
+                perip.RCC.apb2enr.modify(|_, w| w.usart1en().enabled());
+
+                // gpioモード変更
+                let gpioc = &perip.GPIOC;
+                gpioc.moder.modify(|_, w| w.moder4().alternate());
+                gpioc.moder.modify(|_, w| w.moder5().alternate());
+                gpioc.afrl.modify(|_, w| w.afrl4().af7());
+                gpioc.afrl.modify(|_, w| w.afrl5().af7());
+
+                let uart = &perip.USART1;
+                // Set over sampling mode
+                uart.cr1.modify(|_, w| w.over8().clear_bit());
+                // Set parity mode
+                uart.cr1.modify(|_, w| w.pce().clear_bit());
+                // Set word length
+                uart.cr1.modify(|_, w| w.m0().clear_bit());
+                uart.cr1.modify(|_, w| w.m1().clear_bit());
+                // FIFO?
+                // Set baud rate
+                uart.brr.modify(|_, w| unsafe { w.bits(0x4BF) }); // 140MHz / 115200
+
+                // Set stop bit
+                uart.cr2.modify(|_, w| unsafe { w.stop().bits(0b00) });
+
+                // Set uart enable
+                uart.cr1.modify(|_, w| w.ue().set_bit());
+
+                // Set uart recieve enable
+                uart.cr1.modify(|_, w| w.re().set_bit());
+                // Set uart transmitter enable
+                uart.cr1.modify(|_, w| w.te().set_bit());
+            }
+        });
+    }
+    fn putc(&self, c: u8) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let uart = &perip.USART1;
+                uart.tdr.modify(|_, w| unsafe { w.tdr().bits(c.into()) });
+                // while uart.isr.read().tc().bit_is_set() {}
+                while uart.isr.read().txe().bit_is_clear() {}
+            }
+        });
+    }
+}
+
+pub struct BldcPwm {}
+impl<'a> BldcPwm {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                // GPIOポートの電源投入(クロックの有効化)
+                perip.RCC.ahb2enr.modify(|_, w| w.gpioeen().set_bit());
+                perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+
+                // gpioモード変更
+                // I2C
+                let gpioc = &perip.GPIOC;
+                gpioc.otyper.modify(|_, w| w.ot8().open_drain());
+                gpioc.otyper.modify(|_, w| w.ot9().open_drain());
+                gpioc.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+                gpioc.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+                gpioc.moder.modify(|_, w| w.moder8().alternate());
+                gpioc.moder.modify(|_, w| w.moder9().alternate());
+                gpioc.afrh.modify(|_, w| w.afrh8().af8());
+                gpioc.afrh.modify(|_, w| w.afrh9().af8());
+                // IO pin
+                let gpio = &perip.GPIOE;
+                gpio.moder.modify(|_, w| w.moder7().output());
+                gpio.moder.modify(|_, w| w.moder14().input());
+                gpio.moder.modify(|_, w| w.moder15().input());
+                // PWM pin
+                gpio.moder.modify(|_, w| w.moder8().alternate());
+                gpio.moder.modify(|_, w| w.moder9().alternate());
+                gpio.moder.modify(|_, w| w.moder10().alternate());
+                gpio.moder.modify(|_, w| w.moder11().alternate());
+                gpio.moder.modify(|_, w| w.moder12().alternate());
+                gpio.moder.modify(|_, w| w.moder13().alternate());
+                gpio.afrh.modify(|_, w| w.afrh8().af2());
+                gpio.afrh.modify(|_, w| w.afrh9().af2());
+                gpio.afrh.modify(|_, w| w.afrh10().af2());
+                gpio.afrh.modify(|_, w| w.afrh11().af2());
+                gpio.afrh.modify(|_, w| w.afrh12().af2());
+                gpio.afrh.modify(|_, w| w.afrh13().af2());
+                gpio.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+                gpio.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+                gpio.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+                gpio.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
+                gpio.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+                gpio.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+
+                perip.RCC.ccipr.modify(|_, w| w.i2c3sel().pclk());
+                perip.RCC.apb1enr1.modify(|_, w| w.i2c3en().enabled());
+                perip.RCC.apb2enr.modify(|_, w| w.tim1en().enabled());
+
+                let i2c = &perip.I2C3;
+                i2c.cr1.modify(|_, w| w.pe().clear_bit());
+
+                i2c.cr1.modify(|_, w| w.anfoff().disabled());
+                i2c.cr1.modify(|_, w| w.dnf().no_filter());
+                // 140MHz, presc:14-1->10MHz, t=100ns
+                i2c.timingr.modify(|_, w| w.presc().bits(14 - 1));
+                i2c.timingr.modify(|_, w| w.scll().bits(50 - 1)); // t_SCLL 5000ns
+                i2c.timingr.modify(|_, w| w.sclh().bits(40 - 1)); // t_SCLH 4000ns
+                i2c.timingr.modify(|_, w| w.sdadel().bits(5)); // 500ns
+                i2c.timingr.modify(|_, w| w.scldel().bits(12 - 1)); // 1200ns
+
+                i2c.cr1.modify(|_, w| w.nostretch().disabled());
+
+                // Peripheral enable
+                i2c.cr1.modify(|_, w| w.pe().set_bit());
+
+                // For PWM
+                let tim = &perip.TIM1;
+                tim.psc.modify(|_, w| unsafe { w.bits(7 - 1) });
+                tim.arr.modify(|_, w| unsafe { w.bits(800 - 1) }); // 25kHz
+                                                                   // tim.dier.modify(|_, w| w.uie().set_bit());
+
+                // OCxM mode
+                tim.ccmr1_output().modify(|_, w| w.oc1m().pwm_mode1());
+                tim.ccmr1_output().modify(|_, w| w.oc2m().pwm_mode1());
+                tim.ccmr2_output().modify(|_, w| w.oc3m().pwm_mode1());
+                // CCRx
+                tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
+                tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
+                tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
+                                                                    // CCxIE enable interrupt request
+
+                // Set polarity
+                // tim.ccer.modify(|_, w| w.cc1p().clear_bit());
+                // tim.ccer.modify(|_, w| w.cc1np().clear_bit());
+                // PWM mode
+                // tim.cr1.modify(|_, w| unsafe { w.cms().bits(0b00) });
+                // CCxE enable output
+                tim.ccer.modify(|_, w| w.cc1e().set_bit());
+                tim.ccer.modify(|_, w| w.cc1ne().set_bit());
+                tim.ccer.modify(|_, w| w.cc2e().set_bit());
+                tim.ccer.modify(|_, w| w.cc2ne().set_bit());
+                tim.ccer.modify(|_, w| w.cc3e().set_bit());
+                tim.ccer.modify(|_, w| w.cc3ne().set_bit());
+                // enable tim
+                tim.cr1.modify(|_, w| w.cen().set_bit());
+                // BDTR break and dead-time register
+                tim.bdtr.modify(|_, w| w.moe().set_bit());
+
+                // Wait for ready
+                while gpio.idr.read().idr14().is_low() && gpio.idr.read().idr15().is_high() {}
+
+                // Unlock protected register.
+                Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x0F]);
+                // Set gate drive voltage
+                Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x01]);
+                // Lock protected register.
+                Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x00]);
+                // Clear Fault.
+                Self::write_2byte_i2c(&perip, 0x47, &[0x09, 0xFF]);
+
+                // Wake up
+                gpio.bsrr.write(|w| w.bs7().set());
+            }
+        });
+    }
+    pub fn set_u_pwm(&self, p: u32) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let tim = &perip.TIM1;
+                tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+            }
+        });
+    }
+    pub fn set_v_pwm(&self, p: u32) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let tim = &perip.TIM1;
+                tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+            }
+        });
+    }
+    pub fn set_w_pwm(&self, p: u32) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let tim = &perip.TIM1;
+                tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+            }
+        });
+    }
+    pub fn get_nfault_status(&self) -> bool {
+        let mut result = false;
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOE;
+                result = gpio.idr.read().idr15().is_high();
+            }
+        });
+        result
+    }
+    pub fn get_ready_status(&self) -> bool {
+        let mut result = false;
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOE;
+                result = gpio.idr.read().idr14().is_high();
+            }
+        });
+        result
+    }
+    /// Write 'data' to 'address's slave
+    fn write_2byte_i2c(perip: &Peripherals, address: u16, data: &[u8]) {
+        if data.len() != 2 {
+            return;
+        }
+
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let i2c = &perip.I2C3;
+
+                i2c.cr2.modify(|_, w| w.nbytes().bits(2));
+                // Address
+                i2c.cr2.modify(|_, w| w.sadd().bits(address << 1)); // 1000111
+                i2c.cr2.modify(|_, w| w.add10().bit7());
+                // Transfer direction
+                i2c.cr2.modify(|_, w| w.rd_wrn().write());
+                i2c.cr2.modify(|_, w| w.autoend().clear_bit());
+                i2c.cr2.modify(|_, w| w.reload().clear_bit());
+                while i2c.cr2.read().start().bit_is_set() {}
+                i2c.cr2.modify(|_, w| w.start().set_bit());
+                while i2c.isr.read().txis().bit_is_clear() {
+                    // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
+                    // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
+                    // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+                }
+                i2c.txdr.modify(|_, w| w.txdata().bits(data[0]));
+                while i2c.isr.read().txis().bit_is_clear() {
+                    // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
+                    // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
+                    // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+                }
+                i2c.txdr.modify(|_, w| w.txdata().bits(data[1]));
+
+                while i2c.isr.read().tc().bit_is_clear() {
+                    // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
+                    // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
+                }
+                i2c.cr2.modify(|_, w| w.stop().stop());
+            }
+        });
+    }
+}
+
 pub struct Led0 {}
 impl<'a> Indicator for Led0 {
     fn on(&self) {
@@ -532,70 +577,114 @@ impl Led0 {
     }
 }
 
-// pub struct Led1<'a> {
-//     perip: &'a Peripherals,
-// }
-// impl<'a> Indicator for Led1<'a> {
-//     fn on(&self) {
-//         let gpio = &self.perip.GPIOA;
-//         gpio.bsrr.write(|w| w.bs11().set());
-//     }
-//     fn off(&self) {
-//         let gpio = &self.perip.GPIOA;
-//         gpio.bsrr.write(|w| w.br11().reset());
-//     }
-//     fn toggle(&self) {
-//         let gpio = &self.perip.GPIOA;
-//         if gpio.odr.read().odr11().is_low() {
-//             gpio.bsrr.write(|w| w.bs11().set());
-//         } else {
-//             gpio.bsrr.write(|w| w.br11().reset());
-//         }
-//     }
-// }
-// impl<'a> Led1<'a> {
-//     pub fn new(perip: &'a Peripherals) -> Self {
-//         // GPIOポートの電源投入(クロックの有効化)
-//         perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
+pub struct Led1 {}
+impl<'a> Indicator for Led1 {
+    fn on(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOA;
+                gpio.bsrr.write(|w| w.bs11().set());
+            }
+        });
+    }
+    fn off(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOA;
+                gpio.bsrr.write(|w| w.br11().reset());
+            }
+        });
+    }
+    fn toggle(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOA;
+                if gpio.odr.read().odr11().is_low() {
+                    gpio.bsrr.write(|w| w.bs11().set());
+                } else {
+                    gpio.bsrr.write(|w| w.br11().reset());
+                }
+            }
+        });
+    }
+}
+impl Led1 {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| {
+            match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+                None => (),
+                Some(perip) => {
+                    let gpio = &perip.GPIOA;
+                    // GPIOポートの電源投入(クロックの有効化)
+                    perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
 
-//         // gpioモード変更
-//         let gpio = &perip.GPIOA;
-//         gpio.moder.modify(|_, w| w.moder11().output());
+                    // gpioモード変更
+                    let gpio = &perip.GPIOA;
+                    gpio.moder.modify(|_, w| w.moder11().output());
+                }
+            }
+        });
+    }
+}
 
-//         Self { perip }
-//     }
-// }
+pub struct Led2 {}
+impl<'a> Indicator for Led2 {
+    fn on(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOA;
+                gpio.bsrr.write(|w| w.bs10().set());
+            }
+        });
+    }
+    fn off(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOA;
+                gpio.bsrr.write(|w| w.br10().reset());
+            }
+        });
+    }
+    fn toggle(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpio = &perip.GPIOA;
+                if gpio.odr.read().odr10().is_low() {
+                    gpio.bsrr.write(|w| w.bs10().set());
+                } else {
+                    gpio.bsrr.write(|w| w.br10().reset());
+                }
+            }
+        });
+    }
+}
+impl Led2 {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| {
+            match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+                None => (),
+                Some(perip) => {
+                    let gpio = &perip.GPIOA;
+                    // GPIOポートの電源投入(クロックの有効化)
+                    perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
 
-// pub struct Led2<'a> {
-//     perip: &'a Peripherals,
-// }
-// impl<'a> Indicator for Led2<'a> {
-//     fn on(&self) {
-//         let gpio = &self.perip.GPIOA;
-//         gpio.bsrr.write(|w| w.bs10().set());
-//     }
-//     fn off(&self) {
-//         let gpio = &self.perip.GPIOA;
-//         gpio.bsrr.write(|w| w.br10().reset());
-//     }
-//     fn toggle(&self) {
-//         let gpio = &self.perip.GPIOA;
-//         if gpio.odr.read().odr10().is_low() {
-//             gpio.bsrr.write(|w| w.bs10().set());
-//         } else {
-//             gpio.bsrr.write(|w| w.br10().reset());
-//         }
-//     }
-// }
-// impl<'a> Led2<'a> {
-//     pub fn new(perip: &'a Peripherals) -> Self {
-//         // GPIOポートの電源投入(クロックの有効化)
-//         perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
-
-//         // gpioモード変更
-//         let gpio = &perip.GPIOA;
-//         gpio.moder.modify(|_, w| w.moder10().output());
-
-//         Self { perip }
-//     }
-// }
+                    // gpioモード変更
+                    let gpio = &perip.GPIOA;
+                    gpio.moder.modify(|_, w| w.moder10().output());
+                }
+            }
+        });
+    }
+}
