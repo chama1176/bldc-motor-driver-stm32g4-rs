@@ -13,6 +13,7 @@ use stm32g4::stm32g431::Peripherals;
 use stm32g4::stm32g431::NVIC;
 
 use crate::indicator::Indicator;
+use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
 
 pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
@@ -428,33 +429,6 @@ impl<'a> BldcPwm {
             }
         });
     }
-    pub fn set_u_pwm(&self, p: u32) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let tim = &perip.TIM1;
-                tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
-            }
-        });
-    }
-    pub fn set_v_pwm(&self, p: u32) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let tim = &perip.TIM1;
-                tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
-            }
-        });
-    }
-    pub fn set_w_pwm(&self, p: u32) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let tim = &perip.TIM1;
-                tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
-            }
-        });
-    }
     pub fn get_nfault_status(&self) -> bool {
         let mut result = false;
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
@@ -516,6 +490,38 @@ impl<'a> BldcPwm {
                     // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
                 }
                 i2c.cr2.modify(|_, w| w.stop().stop());
+            }
+        });
+    }
+}
+
+impl ThreePhaseMotorDriver for BldcPwm {
+    fn enable(&self) {}
+    fn disable(&self) {}
+    fn set_u_pwm(&self, p: u32) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let tim = &perip.TIM1;
+                tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+            }
+        });
+    }
+    fn set_v_pwm(&self, p: u32) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let tim = &perip.TIM1;
+                tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+            }
+        });
+    }
+    fn set_w_pwm(&self, p: u32) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let tim = &perip.TIM1;
+                tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
             }
         });
     }
