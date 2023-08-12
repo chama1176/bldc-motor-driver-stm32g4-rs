@@ -26,7 +26,6 @@ mod three_phase_motor_driver;
 use crate::indicator::Indicator;
 use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
 
-static COUNTER: Mutex<Cell<u64>> = Mutex::new(Cell::new(0));
 static G_APP: Mutex<
     RefCell<
         Option<
@@ -42,6 +41,10 @@ static G_APP: Mutex<
 
 #[interrupt]
 fn TIM3() {
+    static mut COUNT: u64 = 0;
+    // `COUNT` has type `&mut u32` and it's safe to use
+    *COUNT += 1;
+
     free(|cs| {
         match bldc_motor_driver_stspin32g4::G_PERIPHERAL
             .borrow(cs)
@@ -56,12 +59,11 @@ fn TIM3() {
         match G_APP.borrow(cs).borrow_mut().deref_mut() {
             None => (),
             Some(app) => {
-                app.set_count(COUNTER.borrow(cs).get());
+                app.set_count(COUNT.clone());
                 app.periodic_task();
             }
         }
     });
-    free(|cs| COUNTER.borrow(cs).set(COUNTER.borrow(cs).get() + 1));
 }
 
 #[entry]
