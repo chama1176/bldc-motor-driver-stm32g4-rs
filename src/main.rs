@@ -18,6 +18,7 @@ use stm32g4::stm32g431::Interrupt::TIM3; // you can put a breakpoint on `rust_be
                                          // use panic_itm as _; // logs messages over ITM; requires ITM support
                                          // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
+mod app;
 mod bldc_motor_driver_stspin32g4;
 mod indicator;
 mod three_phase_motor_driver;
@@ -26,87 +27,7 @@ use crate::indicator::Indicator;
 use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
 
 static COUNTER: Mutex<Cell<u64>> = Mutex::new(Cell::new(0));
-
-mod app {
-    use crate::indicator::Indicator;
-    use crate::three_phase_motor_driver::ThreePhase;
-    use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
-
-    pub struct Data {
-        tv: f32,
-        count: u64,
-    }
-    impl Data {
-        pub fn new() -> Self {
-            Self { tv: 0.0, count: 0 }
-        }
-    }
-
-    pub struct App<T0, T1, T2, M>
-    where
-        T0: Indicator,
-        T1: Indicator,
-        T2: Indicator,
-        M: ThreePhaseMotorDriver,
-    {
-        data: Data,
-        led0: T0,
-        led1: T1,
-        led2: T2,
-        bldc: M,
-    }
-
-    impl<T0, T1, T2, M> App<T0, T1, T2, M>
-    where
-        T0: Indicator,
-        T1: Indicator,
-        T2: Indicator,
-        M: ThreePhaseMotorDriver,
-    {
-        pub fn new(led0: T0, led1: T1, led2: T2, bldc: M) -> Self {
-            Self {
-                data: Data::new(),
-                led0,
-                led1,
-                led2,
-                bldc,
-            }
-        }
-        #[rustfmt::skip]
-        pub fn periodic_task(&mut self) {
-            self.led0.toggle();
-            self.led1.toggle();
-            self.led2.toggle();
-
-            let mut tp: ThreePhase<u32> = ThreePhase { u: 0, v: 0, w: 0 };
-
-            match ((self.data.count as f32/(10.0*1.0)) as u64)%6 {
-                0 => tp = ThreePhase{u: 200, v: 0, w: 0},
-                1 => tp = ThreePhase{u: 200, v: 200, w: 0},
-                2 => tp = ThreePhase{u: 0, v: 200, w: 0},
-                3 => tp = ThreePhase{u: 0, v: 200, w: 200},
-                4 => tp = ThreePhase{u: 0, v: 0, w: 200},
-                5 => tp = ThreePhase{u: 200, v: 0, w: 200},
-                6_u64..=u64::MAX => (),
-            }
-            if self.data.tv < 0.1 {
-                tp = ThreePhase{ u: 0, v: 0, w: 0 };
-            }
-            self.bldc.set_u_pwm(tp.u);
-            self.bldc.set_v_pwm(tp.v);
-            self.bldc.set_w_pwm(tp.w);
-        }
-        pub fn set_target_velocity(&mut self, tv: f32) {
-            self.data.tv = tv;
-        }
-        pub fn set_count(&mut self, c: u64) {
-            self.data.count = c;
-        }
-    }
-}
-
-// static adc_data:[u16; 4] = [7; 4];
-pub static G_APP: Mutex<
+static G_APP: Mutex<
     RefCell<
         Option<
             app::App<
@@ -165,9 +86,6 @@ fn main() -> ! {
     uart.init();
     let pwm = bldc_motor_driver_stspin32g4::BldcPwm::new();
     pwm.init();
-    pwm.set_u_pwm(0);
-    pwm.set_v_pwm(0);
-    pwm.set_w_pwm(0);
 
     let spi = bldc_motor_driver_stspin32g4::Spi3::new();
     spi.init();
@@ -195,6 +113,10 @@ fn main() -> ! {
     });
     let mut prev = t;
     let mut cnt = 0;
+    // clear error
+    let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
+    let p: u16 = data.count_ones() as u16 % 2;
+    spi.txrx(data | (p << 15));
 
     loop {
         free(|cs| {
@@ -244,10 +166,10 @@ fn main() -> ! {
                         app.set_target_velocity(tv);
                     }
                 });
-                let data: u16 = 0x03FFF | 0b0100_0000_0000_0000;
+                let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
                 let p: u16 = data.count_ones() as u16 % 2;
-                spi.txrx(data | (p << 7));
-                match spi.txrx(data | (p << 7)) {
+                spi.txrx(data | (p << 15));
+                match spi.txrx(data | (p << 15)) {
                     None => (),
                     Some(data) => {
                         let deg = data as f32 / 16384.0 * 360.0;

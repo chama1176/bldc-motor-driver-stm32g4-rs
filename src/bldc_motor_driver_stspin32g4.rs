@@ -336,9 +336,6 @@ impl Spi3 {
                 gpiob.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
                 gpiob.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
                 gpiob.otyper.modify(|_, w| w.ot6().push_pull()); // CS pin
-                gpiob.otyper.modify(|_, w| w.ot5().push_pull());
-                gpiob.otyper.modify(|_, w| w.ot4().push_pull());
-                gpiob.otyper.modify(|_, w| w.ot3().push_pull());
 
                 let spi = &perip.SPI3;
                 spi.cr1.modify(|_, w| w.spe().clear_bit());
