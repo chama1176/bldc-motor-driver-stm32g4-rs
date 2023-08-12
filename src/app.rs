@@ -16,6 +16,7 @@ where
 {
     tv: f32,
     count: u64,
+    state: State,
     // 
     led0: T0,
     led1: T1,
@@ -34,6 +35,7 @@ where
         Self {
             tv: 0.0, 
             count: 0,
+            state: State::Waiting,
             led0,
             led1,
             led2,
@@ -47,18 +49,21 @@ where
         self.led2.toggle();
 
         let mut tp: ThreePhase<u32> = ThreePhase { u: 0, v: 0, w: 0 };
-
-        match ((self.count as f32/(10.0*1.0)) as u64)%6 {
-            0 => tp = ThreePhase{u: 200, v: 0, w: 0},
-            1 => tp = ThreePhase{u: 200, v: 200, w: 0},
-            2 => tp = ThreePhase{u: 0, v: 200, w: 0},
-            3 => tp = ThreePhase{u: 0, v: 200, w: 200},
-            4 => tp = ThreePhase{u: 0, v: 0, w: 200},
-            5 => tp = ThreePhase{u: 200, v: 0, w: 200},
-            6_u64..=u64::MAX => (),
-        }
-        if self.tv < 0.1 {
-            tp = ThreePhase{ u: 0, v: 0, w: 0 };
+        match self.state {
+            State::Operating =>{
+                match ((self.count as f32/(10.0*1.0)) as u64)%6 {
+                    0 => tp = ThreePhase{u: 200, v: 0, w: 0},
+                    1 => tp = ThreePhase{u: 200, v: 200, w: 0},
+                    2 => tp = ThreePhase{u: 0, v: 200, w: 0},
+                    3 => tp = ThreePhase{u: 0, v: 200, w: 200},
+                    4 => tp = ThreePhase{u: 0, v: 0, w: 200},
+                    5 => tp = ThreePhase{u: 200, v: 0, w: 200},
+                    6_u64..=u64::MAX => (),
+                }
+            }
+            _ =>{
+                tp = ThreePhase{ u: 0, v: 0, w: 0 };
+            }
         }
         self.bldc.set_u_pwm(tp.u);
         self.bldc.set_v_pwm(tp.v);
@@ -69,5 +74,8 @@ where
     }
     pub fn set_count(&mut self, c: u64) {
         self.count = c;
+    }
+    pub fn set_sate(&mut self, s: State){
+        self.state = s
     }
 }

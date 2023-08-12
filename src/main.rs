@@ -166,6 +166,11 @@ fn main() -> ! {
                     None => (),
                     Some(app) => {
                         app.set_target_velocity(tv);
+                        if tv > 0.1 {
+                            app.set_sate(app::State::Operating);
+                        }else{
+                            app.set_sate(app::State::Waiting);
+                        }
                     }
                 });
                 let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
