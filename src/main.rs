@@ -169,6 +169,8 @@ fn main() -> ! {
     pwm.set_v_pwm(0);
     pwm.set_w_pwm(0);
 
+    let spi = bldc_motor_driver_stspin32g4::Spi3::new();
+    spi.init();
     let led0 = bldc_motor_driver_stspin32g4::Led0::new();
     led0.init();
     let led1 = bldc_motor_driver_stspin32g4::Led1::new();
@@ -242,6 +244,17 @@ fn main() -> ! {
                         app.set_target_velocity(tv);
                     }
                 });
+                let data: u16 = 0x03FFF | 0b0100_0000_0000_0000;
+                let p: u16 = data.count_ones() as u16 % 2;
+                spi.txrx(data | (p << 7));
+                match spi.txrx(data | (p << 7)) {
+                    None => (),
+                    Some(data) => {
+                        let deg = data as f32 / 16384.0 * 360.0;
+                        hprintln!("deg: {:}", deg).unwrap();
+                    }
+                }
+
                 write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
             }
             prev = t;

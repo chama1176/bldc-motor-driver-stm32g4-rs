@@ -309,6 +309,100 @@ impl<'a> Uart1 {
     }
 }
 
+pub struct Spi3 {}
+impl Spi3 {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                // GPIOポートの電源投入(クロックの有効化)
+                perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
+                perip.RCC.apb1enr1.modify(|_, w| w.spi3en().enabled());
+
+                // gpioモード変更
+                let gpiob = &perip.GPIOB;
+                gpiob.moder.modify(|_, w| w.moder6().output()); // CS pin
+                gpiob.moder.modify(|_, w| w.moder5().alternate());
+                gpiob.moder.modify(|_, w| w.moder4().alternate());
+                gpiob.moder.modify(|_, w| w.moder3().alternate());
+                gpiob.afrl.modify(|_, w| w.afrl5().af6());
+                gpiob.afrl.modify(|_, w| w.afrl4().af6());
+                gpiob.afrl.modify(|_, w| w.afrl3().af6());
+                gpiob.ospeedr.modify(|_, w| w.ospeedr6().very_high_speed()); // CS pin
+                gpiob.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+                gpiob.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+                gpiob.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+                gpiob.otyper.modify(|_, w| w.ot6().push_pull()); // CS pin
+                gpiob.otyper.modify(|_, w| w.ot5().push_pull());
+                gpiob.otyper.modify(|_, w| w.ot4().push_pull());
+                gpiob.otyper.modify(|_, w| w.ot3().push_pull());
+
+                let spi = &perip.SPI3;
+                spi.cr1.modify(|_, w| w.spe().clear_bit());
+
+                // Set Baudrate
+                spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
+
+                // Set Clock polarity
+                spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low
+
+                // Set Clock phase
+                spi.cr1.modify(|_, w| w.cpha().set_bit()); // second edge(down edge in-case idle is low)
+
+                // Bidirectional data mode enable(half-duplex communication)
+                spi.cr1.modify(|_, w| w.bidimode().clear_bit());
+                // Set MSL LSB first
+                spi.cr1.modify(|_, w| w.lsbfirst().clear_bit());
+                // Set NSS management
+                // Soft ware slave management
+                spi.cr1.modify(|_, w| w.ssm().set_bit());
+                // Internal slave select
+                spi.cr1.modify(|_, w| w.ssi().set_bit());
+                // Master configuration
+                spi.cr1.modify(|_, w| w.mstr().set_bit());
+
+                // Data size
+                spi.cr2.modify(|_, w| unsafe { w.ds().bits(0b1111) }); // 16bit
+
+                // SS output
+                spi.cr2.modify(|_, w| w.ssoe().clear_bit());
+                // Frame format
+                spi.cr2.modify(|_, w| w.frf().clear_bit()); // Motorola mode
+
+                // NSS pulse management
+                spi.cr2.modify(|_, w| w.nssp().set_bit());
+                //
+                spi.cr1.modify(|_, w| w.spe().set_bit());
+            }
+        });
+    }
+    pub fn txrx(&self, c: u16) -> Option<u16> {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (None),
+            Some(perip) => {
+                let gpiob = &perip.GPIOB;
+                gpiob.bsrr.write(|w| w.br6().reset());
+                let spi = &perip.SPI3;
+
+                while spi.sr.read().txe().bit_is_clear() {}
+                // send 8bit data automatically 2 times
+                spi.dr.modify(|_, w| unsafe { w.dr().bits(c.into()) });
+
+                while spi.sr.read().bsy().bit_is_set() {}
+                while spi.sr.read().rxne().bit_is_clear() {}
+                gpiob.bsrr.write(|w| w.bs6().set());
+
+                let data = spi.dr.read().dr().bits();
+                // hprintln!("dr: {:x}", data).unwrap();
+                Some(data & 0x3FFF)
+            }
+        })
+    }
+}
+
 pub struct BldcPwm {}
 impl<'a> BldcPwm {
     pub fn new() -> Self {
