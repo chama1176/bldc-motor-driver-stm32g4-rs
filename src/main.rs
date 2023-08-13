@@ -25,6 +25,7 @@ mod three_phase_motor_driver;
 
 use crate::indicator::Indicator;
 use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
+use motml::utils::Deg;
 
 static G_APP: Mutex<
     RefCell<
@@ -180,7 +181,7 @@ fn main() -> ! {
                     None => (),
                     Some(data) => {
                         let deg = data as f32 / 16384.0 * 360.0;
-                        hprintln!("deg: {:}", deg).unwrap();
+                        hprintln!("deg: {:}, rad: {:}", deg, deg.deg2rad()).unwrap();
                     }
                 }
 

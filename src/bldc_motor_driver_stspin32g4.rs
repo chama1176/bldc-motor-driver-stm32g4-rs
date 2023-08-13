@@ -378,7 +378,7 @@ impl Spi3 {
     }
     pub fn txrx(&self, c: u16) -> Option<u16> {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (None),
+            None => None,
             Some(perip) => {
                 let gpiob = &perip.GPIOB;
                 gpiob.bsrr.write(|w| w.br6().reset());
