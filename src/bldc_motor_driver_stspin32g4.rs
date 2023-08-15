@@ -412,7 +412,7 @@ impl Encoder<f32> for Spi3 {
             None => None,
             Some(data) => {
                 let deg = data as f32 / 16384.0 * 360.0;
-                return Some(deg.deg2rad());
+                return Some(deg.invert_360().deg2rad());
             }
         }
     }
