@@ -13,7 +13,11 @@ use stm32g4::stm32g431::Peripherals;
 use stm32g4::stm32g431::NVIC;
 
 use crate::indicator::Indicator;
-use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
+use motml::encoder::Encoder;
+use motml::motor_driver::OutputStatus;
+use motml::motor_driver::ThreePhaseMotorDriver;
+use motml::motor_driver::ThreePhaseValue;
+use motml::utils::Deg;
 
 pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
@@ -399,6 +403,26 @@ impl Spi3 {
         })
     }
 }
+impl Encoder<f32> for Spi3 {
+    fn get_angle(&self) -> Option<f32> {
+        let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
+        let p: u16 = data.count_ones() as u16 % 2; // parity
+        self.txrx(data | (p << 15));
+        match self.txrx(data | (p << 15)) {
+            None => None,
+            Some(data) => {
+                let deg = data as f32 / 16384.0 * 360.0;
+                return Some(deg.deg2rad());
+            }
+        }
+    }
+    fn reset_error(&self) {
+        // clear error
+        let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
+        let p: u16 = data.count_ones() as u16 % 2;
+        self.txrx(data | (p << 15));
+    }
+}
 
 pub struct BldcPwm {}
 impl<'a> BldcPwm {
@@ -491,6 +515,11 @@ impl<'a> BldcPwm {
                 // tim.ccer.modify(|_, w| w.cc1np().clear_bit());
                 // PWM mode
                 // tim.cr1.modify(|_, w| unsafe { w.cms().bits(0b00) });
+
+                // enable tim
+                tim.cr1.modify(|_, w| w.cen().set_bit());
+                // BDTR break and dead-time register
+                tim.bdtr.modify(|_, w| w.moe().set_bit());
                 // CCxE enable output
                 tim.ccer.modify(|_, w| w.cc1e().set_bit());
                 tim.ccer.modify(|_, w| w.cc1ne().set_bit());
@@ -498,10 +527,6 @@ impl<'a> BldcPwm {
                 tim.ccer.modify(|_, w| w.cc2ne().set_bit());
                 tim.ccer.modify(|_, w| w.cc3e().set_bit());
                 tim.ccer.modify(|_, w| w.cc3ne().set_bit());
-                // enable tim
-                tim.cr1.modify(|_, w| w.cen().set_bit());
-                // BDTR break and dead-time register
-                tim.bdtr.modify(|_, w| w.moe().set_bit());
 
                 // Wait for ready
                 while gpio.idr.read().idr14().is_low() && gpio.idr.read().idr15().is_high() {}
@@ -589,30 +614,63 @@ impl<'a> BldcPwm {
 impl ThreePhaseMotorDriver for BldcPwm {
     fn enable(&self) {}
     fn disable(&self) {}
-    fn set_u_pwm(&self, p: u32) {
+    /// 0~1
+    fn set_pwm(&self, value: ThreePhaseValue<f32>) {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
                 let tim = &perip.TIM1;
-                tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+                tim.ccr1
+                    .modify(|_, w| unsafe { w.ccr().bits((value.u * 800.) as u32) }); // x/800
+                tim.ccr2
+                    .modify(|_, w| unsafe { w.ccr().bits((value.v * 800.) as u32) }); // x/800
+                tim.ccr3
+                    .modify(|_, w| unsafe { w.ccr().bits((value.w * 800.) as u32) });
+                // x/800
             }
         });
     }
-    fn set_v_pwm(&self, p: u32) {
+    fn modify_pwm_output(&self, value: ThreePhaseValue<OutputStatus>) {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
                 let tim = &perip.TIM1;
-                tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
-            }
-        });
-    }
-    fn set_w_pwm(&self, p: u32) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let tim = &perip.TIM1;
-                tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(p) }); // x/800
+                match value.u {
+                    OutputStatus::Enable => {
+                        // CCxE enable output
+                        tim.ccer.modify(|_, w| w.cc1e().set_bit());
+                        tim.ccer.modify(|_, w| w.cc1ne().set_bit());
+                    }
+                    OutputStatus::Disable => {
+                        // CCxE enable output
+                        tim.ccer.modify(|_, w| w.cc1e().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc1ne().clear_bit());
+                    }
+                }
+                match value.v {
+                    OutputStatus::Enable => {
+                        // CCxE enable output
+                        tim.ccer.modify(|_, w| w.cc2e().set_bit());
+                        tim.ccer.modify(|_, w| w.cc2ne().set_bit());
+                    }
+                    OutputStatus::Disable => {
+                        // CCxE enable output
+                        tim.ccer.modify(|_, w| w.cc2e().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc2ne().clear_bit());
+                    }
+                }
+                match value.w {
+                    OutputStatus::Enable => {
+                        // CCxE enable output
+                        tim.ccer.modify(|_, w| w.cc3e().set_bit());
+                        tim.ccer.modify(|_, w| w.cc3ne().set_bit());
+                    }
+                    OutputStatus::Disable => {
+                        // CCxE enable output
+                        tim.ccer.modify(|_, w| w.cc3e().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc3ne().clear_bit());
+                    }
+                }
             }
         });
     }

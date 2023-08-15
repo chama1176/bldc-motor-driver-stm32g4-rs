@@ -1,11 +1,14 @@
 use crate::indicator::Indicator;
-use crate::three_phase_motor_driver::ThreePhase;
-use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
+use motml::motor_driver::OutputStatus;
+use motml::motor_driver::ThreePhaseMotorDriver;
+use motml::motor_driver::ThreePhaseValue;
 
 pub enum State {
     Waiting,
     Calibrating,
     Operating,
+    OperatingForcedCommutation,
+    OperatingForcedCommutation2,
 }
 pub struct App<T0, T1, T2, M>
 where
@@ -17,7 +20,7 @@ where
     tv: f32,
     count: u64,
     state: State,
-    // 
+    //
     led0: T0,
     led1: T1,
     led2: T2,
@@ -33,7 +36,7 @@ where
 {
     pub fn new(led0: T0, led1: T1, led2: T2, bldc: M) -> Self {
         Self {
-            tv: 0.0, 
+            tv: 0.0,
             count: 0,
             state: State::Waiting,
             led0,
@@ -48,26 +51,61 @@ where
         self.led1.toggle();
         self.led2.toggle();
 
-        let mut tp: ThreePhase<u32> = ThreePhase { u: 0, v: 0, w: 0 };
+        let mut tp: ThreePhaseValue<f32> = ThreePhaseValue { u: 0., v: 0., w: 0. };
+        let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
         match self.state {
-            State::Operating =>{
+            State::OperatingForcedCommutation =>{
                 match ((self.count as f32/(10.0*1.0)) as u64)%6 {
-                    0 => tp = ThreePhase{u: 200, v: 0, w: 0},
-                    1 => tp = ThreePhase{u: 200, v: 200, w: 0},
-                    2 => tp = ThreePhase{u: 0, v: 200, w: 0},
-                    3 => tp = ThreePhase{u: 0, v: 200, w: 200},
-                    4 => tp = ThreePhase{u: 0, v: 0, w: 200},
-                    5 => tp = ThreePhase{u: 200, v: 0, w: 200},
+                    0 => {
+                        tp = ThreePhaseValue{u: 0.25, v: 0., w: 0.};
+                        tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
+                    },
+                    1 => {
+                        tp = ThreePhaseValue{u: 0.25, v: 0., w: 0.};
+                        tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Disable, w: OutputStatus::Enable};
+                    },
+                    2 => {
+                        tp = ThreePhaseValue{u: 0., v: 0.25, w: 0.};
+                        tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
+                    },
+                    3 => {
+                        tp = ThreePhaseValue{u: 0., v: 0.25, w: 0.};
+                        tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
+                    },
+                    4 => {
+                        tp = ThreePhaseValue{u: 0., v: 0., w: 0.25};
+                        tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Disable, w: OutputStatus::Enable};
+                    },
+                    5 => {
+                        tp = ThreePhaseValue{u: 0., v: 0., w: 0.25};
+                        tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
+                    },
                     6_u64..=u64::MAX => (),
                 }
             }
+            State::OperatingForcedCommutation2 =>{
+                match ((self.count as f32/(10.0*1.0)) as u64)%6 {
+                    0 => tp = ThreePhaseValue{u: 0.25, v: 0., w: 0.},
+                    1 => tp = ThreePhaseValue{u: 0.25, v: 0.25, w: 0.},
+                    2 => tp = ThreePhaseValue{u: 0., v: 0.25, w: 0.},
+                    3 => tp = ThreePhaseValue{u: 0., v: 0.25, w: 0.25},
+                    4 => tp = ThreePhaseValue{u: 0., v: 0., w: 0.25},
+                    5 => tp = ThreePhaseValue{u: 0.25, v: 0., w: 0.25},
+                    6_u64..=u64::MAX => (),
+                }
+            }
+            State::Operating => {
+                tp = ThreePhaseValue{ u: 0., v: 0., w: 0. };
+            }
+            State::Calibrating => {
+                tp = ThreePhaseValue{ u: 0.25, v: 0., w: 0. };
+            }
             _ =>{
-                tp = ThreePhase{ u: 0, v: 0, w: 0 };
+                tp = ThreePhaseValue{ u: 0., v: 0., w: 0. };
             }
         }
-        self.bldc.set_u_pwm(tp.u);
-        self.bldc.set_v_pwm(tp.v);
-        self.bldc.set_w_pwm(tp.w);
+        self.bldc.set_pwm(tp);
+        self.bldc.modify_pwm_output(tpe);
     }
     pub fn set_target_velocity(&mut self, tv: f32) {
         self.tv = tv;
@@ -75,7 +113,7 @@ where
     pub fn set_count(&mut self, c: u64) {
         self.count = c;
     }
-    pub fn set_sate(&mut self, s: State){
+    pub fn set_sate(&mut self, s: State) {
         self.state = s
     }
 }

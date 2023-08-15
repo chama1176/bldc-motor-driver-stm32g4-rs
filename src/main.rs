@@ -21,10 +21,9 @@ use stm32g4::stm32g431::Interrupt::TIM3; // you can put a breakpoint on `rust_be
 mod app;
 mod bldc_motor_driver_stspin32g4;
 mod indicator;
-mod three_phase_motor_driver;
 
-use crate::indicator::Indicator;
-use crate::three_phase_motor_driver::ThreePhaseMotorDriver;
+use motml::encoder::Encoder;
+use motml::motor_driver;
 use motml::utils::Deg;
 
 static G_APP: Mutex<
@@ -116,10 +115,7 @@ fn main() -> ! {
     });
     let mut prev = t;
     let mut cnt = 0;
-    // clear error
-    let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
-    let p: u16 = data.count_ones() as u16 % 2;
-    spi.txrx(data | (p << 15));
+    spi.reset_error();
 
     loop {
         free(|cs| {
@@ -157,9 +153,6 @@ fn main() -> ! {
                 // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
                 let mut tv = (adc_data[4] as f32 - 4000.0f32) / 2000.0f32;
-                if tv < 0.0 {
-                    tv = 0.0;
-                }
                 if tv > 1.0 {
                     tv = 1.0;
                 }
@@ -168,22 +161,17 @@ fn main() -> ! {
                     Some(app) => {
                         app.set_target_velocity(tv);
                         if tv > 0.1 {
-                            app.set_sate(app::State::Operating);
-                        }else{
+                            app.set_sate(app::State::OperatingForcedCommutation);
+                        } else if tv < -0.5 {
+                            app.set_sate(app::State::Calibrating); //0.3 u
+                        } else {
                             app.set_sate(app::State::Waiting);
                         }
                     }
                 });
-                let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
-                let p: u16 = data.count_ones() as u16 % 2;
-                spi.txrx(data | (p << 15));
-                match spi.txrx(data | (p << 15)) {
-                    None => (),
-                    Some(data) => {
-                        let deg = data as f32 / 16384.0 * 360.0;
-                        hprintln!("deg: {:}, rad: {:}", deg, deg.deg2rad()).unwrap();
-                    }
-                }
+                let rad = spi.get_angle().unwrap();
+                let deg = rad.rad2deg();
+                hprintln!("deg: {:}, rad: {:}", deg, rad).unwrap();
 
                 write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
             }
