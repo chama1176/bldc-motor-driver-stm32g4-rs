@@ -34,6 +34,7 @@ static G_APP: Mutex<
                 bldc_motor_driver_stspin32g4::Led1,
                 bldc_motor_driver_stspin32g4::Led2,
                 bldc_motor_driver_stspin32g4::BldcPwm,
+                bldc_motor_driver_stspin32g4::Spi3,
             >,
         >,
     >,
@@ -91,13 +92,14 @@ fn main() -> ! {
 
     let spi = bldc_motor_driver_stspin32g4::Spi3::new();
     spi.init();
+    spi.reset_error();
     let led0 = bldc_motor_driver_stspin32g4::Led0::new();
     led0.init();
     let led1 = bldc_motor_driver_stspin32g4::Led1::new();
     led1.init();
     let led2 = bldc_motor_driver_stspin32g4::Led2::new();
     led2.init();
-    let app = app::App::new(led0, led1, led2, pwm);
+    let app = app::App::new(led0, led1, led2, pwm, spi);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
 
     let mut t = 0;
@@ -115,7 +117,6 @@ fn main() -> ! {
     });
     let mut prev = t;
     let mut cnt = 0;
-    spi.reset_error();
 
     loop {
         free(|cs| {
@@ -156,10 +157,12 @@ fn main() -> ! {
                 if tv > 1.0 {
                     tv = 1.0;
                 }
+                let mut rad = 0.;
                 free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
                     None => (),
                     Some(app) => {
                         app.set_target_velocity(tv);
+                        rad = app.read_encoder_data();
                         if tv > 0.1 {
                             app.set_sate(app::State::OperatingForcedCommutation);
                         } else if tv < -0.5 {
@@ -169,9 +172,9 @@ fn main() -> ! {
                         }
                     }
                 });
-                let rad = spi.get_angle().unwrap();
                 let deg = rad.rad2deg();
-                hprintln!("deg: {:}, rad: {:}", deg, rad).unwrap();
+                // hprintln!("deg: {:}, rad: {:}", deg, rad).unwrap();
+                write!(uart, "deg: {:}, rad: {:}", deg, rad).unwrap();
 
                 write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
             }

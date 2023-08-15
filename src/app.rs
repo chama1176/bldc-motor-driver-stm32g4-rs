@@ -2,6 +2,7 @@ use crate::indicator::Indicator;
 use motml::motor_driver::OutputStatus;
 use motml::motor_driver::ThreePhaseMotorDriver;
 use motml::motor_driver::ThreePhaseValue;
+use motml::encoder::Encoder;
 
 pub enum State {
     Waiting,
@@ -10,12 +11,13 @@ pub enum State {
     OperatingForcedCommutation,
     OperatingForcedCommutation2,
 }
-pub struct App<T0, T1, T2, M>
+pub struct App<T0, T1, T2, M, E>
 where
     T0: Indicator,
     T1: Indicator,
     T2: Indicator,
     M: ThreePhaseMotorDriver,
+    E: Encoder<f32>,
 {
     tv: f32,
     count: u64,
@@ -25,16 +27,18 @@ where
     led1: T1,
     led2: T2,
     bldc: M,
+    encoder: E,
 }
 
-impl<T0, T1, T2, M> App<T0, T1, T2, M>
+impl<T0, T1, T2, M, E> App<T0, T1, T2, M, E>
 where
     T0: Indicator,
     T1: Indicator,
     T2: Indicator,
     M: ThreePhaseMotorDriver,
+    E: Encoder<f32>,
 {
-    pub fn new(led0: T0, led1: T1, led2: T2, bldc: M) -> Self {
+    pub fn new(led0: T0, led1: T1, led2: T2, bldc: M, encoder: E) -> Self {
         Self {
             tv: 0.0,
             count: 0,
@@ -43,6 +47,7 @@ where
             led1,
             led2,
             bldc,
+            encoder,
         }
     }
     #[rustfmt::skip]
@@ -115,5 +120,8 @@ where
     }
     pub fn set_sate(&mut self, s: State) {
         self.state = s
+    }
+    pub fn read_encoder_data(&mut self) -> f32 {
+        self.encoder.get_angle().unwrap()
     }
 }
