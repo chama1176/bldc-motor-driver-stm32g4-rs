@@ -1,8 +1,8 @@
 use crate::indicator::Indicator;
+use motml::encoder::Encoder;
 use motml::motor_driver::OutputStatus;
 use motml::motor_driver::ThreePhaseMotorDriver;
 use motml::motor_driver::ThreePhaseValue;
-use motml::encoder::Encoder;
 
 pub enum State {
     Waiting,
@@ -21,7 +21,9 @@ where
 {
     tv: f32,
     count: u64,
+    calib_count: u8,    // rad
     state: State,
+    encoder_offset: f32,
     //
     led0: T0,
     led1: T1,
@@ -42,7 +44,9 @@ where
         Self {
             tv: 0.0,
             count: 0,
+            calib_count: 0,
             state: State::Waiting,
+            encoder_offset: 0.23163112,
             led0,
             led1,
             led2,
@@ -56,6 +60,7 @@ where
         self.led1.toggle();
         self.led2.toggle();
 
+        self.calib_count = 7;
         let mut tp: ThreePhaseValue<f32> = ThreePhaseValue { u: 0., v: 0., w: 0. };
         let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
         match self.state {
@@ -89,7 +94,8 @@ where
                 }
             }
             State::OperatingForcedCommutation2 =>{
-                match ((self.count as f32/(10.0*1.0)) as u64)%6 {
+                let s =((self.count as f32/(1000.0*1.0)) as u64)%6; 
+                match s {
                     0 => tp = ThreePhaseValue{u: 0.25, v: 0., w: 0.},
                     1 => tp = ThreePhaseValue{u: 0.25, v: 0.25, w: 0.},
                     2 => tp = ThreePhaseValue{u: 0., v: 0.25, w: 0.},
@@ -98,6 +104,7 @@ where
                     5 => tp = ThreePhaseValue{u: 0.25, v: 0., w: 0.25},
                     6_u64..=u64::MAX => (),
                 }
+                self.calib_count = s as u8;
             }
             State::Operating => {
                 tp = ThreePhaseValue{ u: 0., v: 0., w: 0. };
@@ -121,7 +128,10 @@ where
     pub fn set_sate(&mut self, s: State) {
         self.state = s
     }
+    pub fn calib_count(&mut self) -> u8 {
+        self.calib_count
+    }
     pub fn read_encoder_data(&mut self) -> f32 {
-        self.encoder.get_angle().unwrap()
+        self.encoder.get_angle().unwrap() - self.encoder_offset
     }
 }
