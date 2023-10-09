@@ -15,8 +15,10 @@ use stm32g4::stm32g431::NVIC;
 use crate::indicator::Indicator;
 use motml::encoder::Encoder;
 use motml::motor_driver::OutputStatus;
+use motml::motor_driver::ThreePhaseCurrent;
 use motml::motor_driver::ThreePhaseMotorDriver;
 use motml::motor_driver::ThreePhaseValue;
+use motml::motor_driver::ThreePhaseVoltage;
 use motml::utils::Deg;
 
 pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
@@ -180,7 +182,7 @@ pub fn adc2_init(perip: &Peripherals) {
                                                  // 1周は実行したいが，常に変換しつづけるのは困る
     adc.cfgr.modify(|_, w| w.extsel().tim6_trgo()); // dma enable
     adc.cfgr.modify(|_, w| w.exten().rising_edge()); // dma enable
-    adc.cfgr2.modify(|_, w| w.rovse().enabled()); // over sampling enable
+    adc.cfgr2.modify(|_, w| w.rovse().disabled()); // over sampling enable
 
     perip
         .ADC12_COMMON
@@ -202,6 +204,14 @@ pub fn adc2_init(perip: &Peripherals) {
     assert!(adc.cr.read().aden().is_enable() == false);
     adc.cr.modify(|_, w| w.adcal().calibration()); // Start calibration
     while !adc.cr.read().adcal().is_complete() {} // Wait for calibration complete
+
+    // 1: Current W
+    // 3: 1.5V Ref
+    // 4: Current V
+    // 6: Temp Coil
+    // 7: AD0
+    // 8: Temp FET
+    // 9: Battery Voltage
 
     adc.smpr1.modify(|_, w| w.smp1().cycles24_5()); // sampling time selection
     adc.smpr1.modify(|_, w| w.smp3().cycles24_5()); // sampling time selection
@@ -615,17 +625,17 @@ impl ThreePhaseMotorDriver for BldcPwm {
     fn enable(&self) {}
     fn disable(&self) {}
     /// 0~1
-    fn set_pwm(&self, value: ThreePhaseValue<f32>) {
+    fn set_pwm(&self, value: ThreePhaseVoltage<f32>) {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
                 let tim = &perip.TIM1;
                 tim.ccr1
-                    .modify(|_, w| unsafe { w.ccr().bits((value.u * 800.) as u32) }); // x/800
+                    .modify(|_, w| unsafe { w.ccr().bits((value.v_u * 800.) as u32) }); // x/800
                 tim.ccr2
-                    .modify(|_, w| unsafe { w.ccr().bits((value.v * 800.) as u32) }); // x/800
+                    .modify(|_, w| unsafe { w.ccr().bits((value.v_v * 800.) as u32) }); // x/800
                 tim.ccr3
-                    .modify(|_, w| unsafe { w.ccr().bits((value.w * 800.) as u32) });
+                    .modify(|_, w| unsafe { w.ccr().bits((value.v_w * 800.) as u32) });
                 // x/800
             }
         });

@@ -139,21 +139,21 @@ fn main() -> ! {
                 // app.periodic_task();
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
-                // write!(
-                //     uart,
-                //     "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
-                //     adc_data[0],
-                //     adc_data[1],
-                //     adc_data[2],
-                //     adc_data[3],
-                //     adc_data[4],
-                //     adc_data[5],
-                //     adc_data[6]
-                // )
-                // .unwrap();
+                write!(
+                    uart,
+                    "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
+                    adc_data[0],
+                    adc_data[1],
+                    adc_data[2],
+                    adc_data[3],
+                    adc_data[4],
+                    adc_data[5],
+                    adc_data[6]
+                )
+                .unwrap();
                 // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
-                let mut tv = (adc_data[4] as f32 - 4000.0f32) / 2000.0f32;
+                let mut tv = (adc_data[4] as f32 - 2000.0f32) / 1000.0f32;
                 if tv > 1.0 {
                     tv = 1.0;
                 }
@@ -166,7 +166,10 @@ fn main() -> ! {
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();
                         if tv > 0.1 {
-                            app.set_sate(app::State::OperatingForcedCommutation2);
+                            // app.set_sate(app::State::OperatingForcedCommutation2);
+                            // app.set_sate(app::State::Operating120DegreeDrive);
+                            app.set_sate(app::State::OperatingQPhase);
+                            
                         } else if tv < -0.5 {
                             app.set_sate(app::State::Calibrating);
                         } else {
