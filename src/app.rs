@@ -161,7 +161,7 @@ where
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
             State::Calibrating => {
-                tp = ThreePhaseVoltage{ v_u: 0.25, v_v: 0., v_w: 0. };
+                tp = ThreePhaseVoltage{ v_u: 0.05, v_v: 0., v_w: 0. };
             }
             _ =>{
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };

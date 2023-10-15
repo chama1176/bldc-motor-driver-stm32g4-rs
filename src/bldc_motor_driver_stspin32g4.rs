@@ -544,7 +544,7 @@ impl<'a> BldcPwm {
                 // Unlock protected register.
                 Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x0F]);
                 // Set gate drive voltage
-                Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x01]);
+                Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x00]);
                 // Lock protected register.
                 Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x00]);
                 // Clear Fault.
