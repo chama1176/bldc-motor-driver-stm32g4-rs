@@ -2,14 +2,13 @@
 #![no_main]
 
 // pick a panicking behavior
-use core::cell::{Cell, RefCell};
+use core::cell::{RefCell};
 use core::fmt::Write;
 use core::ops::DerefMut;
 use panic_halt as _;
 
 use cortex_m::interrupt::{free, Mutex};
 use cortex_m_rt::entry;
-use cortex_m_semihosting::hprintln;
 
 use stm32g4::stm32g431;
 use stm32g4::stm32g431::interrupt;
@@ -169,7 +168,6 @@ fn main() -> ! {
                             // app.set_sate(app::State::OperatingForcedCommutation2);
                             // app.set_sate(app::State::Operating120DegreeDrive);
                             app.set_sate(app::State::OperatingQPhase);
-                            
                         } else if tv < -0.5 {
                             app.set_sate(app::State::Calibrating);
                         } else {

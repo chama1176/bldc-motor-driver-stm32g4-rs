@@ -157,3 +157,4 @@ These command run openocd and connect to that, with gdb debugger.
 
 ## Memo
 - cargo readobj --bin bldc-motor-driver-stspin32g4 -- --file-headers
+- cargo size --bin bldc-motor-driver-stspin32g4 --release -- -A

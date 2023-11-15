@@ -14,6 +14,9 @@ rustflags = [
   # See https://github.com/rust-embedded/cortex-m-quickstart/pull/95
   "-C", "link-arg=--nmagic",
 
+  # 
+  "-C", "opt-level=s",
+
   # LLD (shipped with the Rust toolchain) is used as the default linker
   "-C", "link-arg=-Tlink.x",
 
