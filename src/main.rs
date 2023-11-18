@@ -4,6 +4,7 @@
 // pick a panicking behavior
 use core::cell::{RefCell};
 use core::fmt::Write;
+use core::ops::DerefMut;
 use panic_halt as _;
 
 use cortex_m::interrupt::{free, Mutex};
@@ -40,7 +41,7 @@ static G_APP: Mutex<
 
 #[interrupt]
 fn TIM3() {
-    static mut COUNT: u64 = 0;
+    static mut COUNT: u32 = 0;
     // `COUNT` has type `&mut u32` and it's safe to use
     *COUNT += 1;
 
@@ -55,13 +56,13 @@ fn TIM3() {
                 perip.TIM3.sr.modify(|_, w| w.uif().clear_bit());
             }
         }
-        // match G_APP.borrow(cs).borrow_mut().deref_mut() {
-        //     None => (),
-        //     Some(app) => {
-        //         app.set_count(COUNT.clone());
-        //         app.periodic_task();
-        //     }
-        // }
+        match G_APP.borrow(cs).borrow_mut().deref_mut() {
+            None => (),
+            Some(app) => {
+                app.set_count(COUNT.clone());
+                app.periodic_task();
+            }
+        }
     });
 }
 
@@ -157,23 +158,23 @@ fn main() -> ! {
                 }
                 let mut rad = 0.;
                 let mut calib_count = 7;
-                // free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
-                //     None => (),
-                //     Some(app) => {
-                //         app.set_target_velocity(tv);
-                //         rad = app.read_encoder_data();
-                //         calib_count = app.calib_count();
-                //         if tv > 0.1 {
-                //             // app.set_sate(app::State::OperatingForcedCommutation2);
-                //             // app.set_sate(app::State::Operating120DegreeDrive);
-                //             app.set_sate(app::State::OperatingQPhase);
-                //         } else if tv < -0.5 {
-                //             app.set_sate(app::State::Calibrating);
-                //         } else {
-                //             app.set_sate(app::State::Waiting);
-                //         }
-                //     }
-                // });
+                free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
+                    None => (),
+                    Some(app) => {
+                        app.set_target_velocity(tv);
+                        rad = app.read_encoder_data();
+                        calib_count = app.calib_count();
+                        if tv > 0.1 {
+                            // app.set_sate(app::State::OperatingForcedCommutation2);
+                            // app.set_sate(app::State::Operating120DegreeDrive);
+                            app.set_sate(app::State::OperatingQPhase);
+                        } else if tv < -0.5 {
+                            app.set_sate(app::State::Calibrating);
+                        } else {
+                            app.set_sate(app::State::Waiting);
+                        }
+                    }
+                });
                 let deg = rad.rad2deg();
                 // hprintln!("deg: {:}, rad: {:}", deg, rad).unwrap();
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();

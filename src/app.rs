@@ -26,7 +26,7 @@ where
     E: Encoder<f32>,
 {
     tv: f32,
-    count: u64,
+    count: u32,
     calib_count: u8, // rad
     state: State,
     encoder_offset: f32,
@@ -73,7 +73,7 @@ where
         let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
         match self.state {
             State::OperatingForcedCommutation =>{
-                match ((self.count as f32/(10.0*1.0)) as u64)%6 {
+                match ((self.count as f32/(10.0*1.0)) as u32)%6 {
                     0 => {
                         tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.};
                         tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
@@ -98,7 +98,7 @@ where
                         tp = ThreePhaseVoltage{v_u: 0., v_v: 0., v_w: 0.25};
                         tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
                     },
-                    6_u64..=u64::MAX => (),
+                    6_u32..=u32::MAX => (),
                 }
             }
             State::Operating120DegreeDrive =>{
@@ -145,7 +145,7 @@ where
                 }
             }
             State::OperatingForcedCommutation2 =>{
-                let s =((self.count as f32/(1000.0*1.0)) as u64)%6;
+                let s =((self.count as f32/(1000.0*1.0)) as u32)%6;
                 match s {
                     0 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.},
                     1 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0.25, v_w: 0.},
@@ -153,7 +153,7 @@ where
                     3 => tp = ThreePhaseVoltage{v_u: 0., v_v: 0.25, v_w: 0.25},
                     4 => tp = ThreePhaseVoltage{v_u: 0., v_v: 0., v_w: 0.25},
                     5 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.25},
-                    6_u64..=u64::MAX => (),
+                    6_u32..=u32::MAX => (),
                 }
                 self.calib_count = s as u8;
             }
@@ -173,7 +173,7 @@ where
     pub fn set_target_velocity(&mut self, tv: f32) {
         self.tv = tv;
     }
-    pub fn set_count(&mut self, c: u64) {
+    pub fn set_count(&mut self, c: u32) {
         self.count = c;
     }
     pub fn set_sate(&mut self, s: State) {
