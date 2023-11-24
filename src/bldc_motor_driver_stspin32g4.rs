@@ -5,8 +5,7 @@ use cortex_m::interrupt::{free, Mutex};
 use cortex_m::register;
 
 #[allow(unused_imports)]
-// use cortex_m_semihosting::hprintln;
-
+use cortex_m_semihosting::hprintln;
 use stm32g4::stm32g431::CorePeripherals;
 use stm32g4::stm32g431::Interrupt;
 use stm32g4::stm32g431::Peripherals;
@@ -257,55 +256,60 @@ pub fn init_g_peripheral(perip: Peripherals) {
     free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
 }
 
-pub struct FrashStorage {
-    flash: FLASH,
-}
+pub struct FrashStorage {}
 impl<'a> FrashStorage {
-    pub fn new(flash: FLASH) -> Self {
-        Self { flash: flash }
-    }
-    pub fn init(&self) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {}
-        });
+    pub fn new() -> Self {
+        Self {}
     }
     pub fn write(&self) {
-        // Dual bank
-        // Bank2
-        // Page 0 0x0804_0000 - 0x0804_07FF 2K
-        // Page 1 0x0804_0800 - 0x0804_0FFF 2K
-
-        // Unlocking the Flash memory
-        // Check BSY in FLASH_SR is not set.
-        while self.flash.sr.read().bsy().bit_is_set() {}
-        // 1. Write KEY1 = 0x45670123 in the Flash key register (FLASH_KEYR)
-        self.flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
-        // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
-        self.flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
-
-        // Page erase
-        // Check BSY in FLASH_SR is not set.
-        while self.flash.sr.read().bsy().bit_is_set() {}
-        // Check and clear all error programming flags due to a previous programming. If not, PGSERR is set
-        self.check_and_clear_all_error();
-        // In dual bank mode (DBANK option bit is set),
-        // set the PER bit and select the page to erase (PNB)
-        // with the associated bank (BKER) in the Flash control register (FLASH_CR).
-        self.flash.cr.write(|w| w.per().set_bit());
-        self.flash
-            .cr
-            .write(|w| unsafe { w.pnb().bits(0x0000_0000) });
-        self.flash.cr.write(|w| w.per().set_bit());
-        self.flash.cr.write(|w| unsafe { w.pnb().bits(0) });
-        // Set the STRT bit in the FLASH_CR register.
-        self.flash.cr.write(|w| w.strt().set_bit());
-        //  Wait for the BSY bit to be cleared in the FLASH_SR register.
-        while self.flash.sr.read().bsy().bit_is_set() {}
-
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
+                let flash = &perip.FLASH;
+                hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                // Unlocking the Flash memory
+                // Check BSY in FLASH_SR is not set.
+                while flash.sr.read().bsy().bit_is_set() {}
+                // 1. Write KEY1 = 0x45670123 in the Flash key register (FLASH_KEYR)
+                flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
+                // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
+                flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
+                hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+
+                // Page erase
+                // Check BSY in FLASH_SR is not set.
+                while flash.sr.read().bsy().bit_is_set() {}
+                // Check and clear all error programming flags due to a previous programming. If not, PGSERR is set
+                self.check_and_clear_all_error(&flash);
+                // flash.sr.write(|w| unsafe { w.bits(0) });
+                // In dual bank mode (DBANK option bit is set),
+                // set the PER bit and select the page to erase (PNB)
+                // with the associated bank (BKER) in the Flash control register (FLASH_CR).
+                // flash.cr.write(|w| w.per().set_bit());
+
+                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                // flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
+                // // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
+                // flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
+                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                // flash.cr.write(|w| unsafe { w.pnb().bits(15) });
+
+                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                // flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
+                // // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
+                // flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
+                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+
+
+                // Set the STRT bit in the FLASH_CR register.
+                flash.cr.write(|w| unsafe {w.pnb().bits(15).per().set_bit().strt().set_bit()});
+                hprintln!("per bit: {}", flash.cr.read().per().bits()).unwrap();
+                hprintln!("pnb bit: {}", flash.cr.read().pnb().bits()).unwrap();
+                hprintln!("strt bit: {}", flash.cr.read().strt().bits()).unwrap();
+                //  Wait for the BSY bit to be cleared in the FLASH_SR register.
+                hprintln!("bsy bit: {}", flash.sr.read().bsy().bits()).unwrap();
+                while flash.sr.read().bsy().bit_is_set() {}
+                hprintln!("bsy bit: {}", flash.sr.read().bsy().bits()).unwrap();
 
                 // FLASH programming
                 // Check BSY in FLASH_SR is not set.
@@ -316,43 +320,54 @@ impl<'a> FrashStorage {
                 //  Wait for the BSY bit to be cleared in the FLASH_SR register.
                 // Check that EOP flag is set in the FLASH_SR register (meaning that the programming operation has succeed), and clear it by software.
 
-                // Clear the PG bit in the FLASH_SR register if there no more programming request anymore.
+                // Clear the PG bit in the FLASH_CR register if there no more programming request anymore.
             }
         });
     }
-    fn check_and_clear_all_error(&self) {
-        if self.flash.sr.read().optverr().bit_is_set() {
-            self.flash.sr.write(|w| w.optverr().set_bit())
+    fn check_and_clear_all_error(&self, flash: &FLASH) {
+        if flash.sr.read().optverr().bit_is_set() {
+            hprintln!("optverr error occured: {}", flash.sr.read().optverr().bits()).unwrap();
+            flash.sr.write(|w| w.optverr().set_bit())
         }
-        if self.flash.sr.read().rderr().bit_is_set() {
-            self.flash.sr.write(|w| w.rderr().set_bit())
+        if flash.sr.read().rderr().bit_is_set() {
+            hprintln!("rderr error occured: {}", flash.sr.read().rderr().bits()).unwrap();
+            flash.sr.write(|w| w.rderr().set_bit())
         }
-        if self.flash.sr.read().fasterr().bit_is_set() {
-            self.flash.sr.write(|w| w.fasterr().set_bit())
+        if flash.sr.read().fasterr().bit_is_set() {
+            hprintln!("fasterr error occured: {}", flash.sr.read().fasterr().bits()).unwrap();
+            flash.sr.write(|w| w.fasterr().set_bit())
         }
-        if self.flash.sr.read().miserr().bit_is_set() {
-            self.flash.sr.write(|w| w.miserr().set_bit())
+        if flash.sr.read().miserr().bit_is_set() {
+            hprintln!("miserr error occured: {}", flash.sr.read().miserr().bits()).unwrap();
+            flash.sr.write(|w| w.miserr().set_bit())
         }
-        if self.flash.sr.read().pgserr().bit_is_set() {
-            self.flash.sr.write(|w| w.pgserr().set_bit())
+        if flash.sr.read().pgserr().bit_is_set() {
+            hprintln!("pgserr error occured: {}", flash.sr.read().pgserr().bits()).unwrap();
+            flash.sr.write(|w| w.pgserr().set_bit())
         }
-        if self.flash.sr.read().sizerr().bit_is_set() {
-            self.flash.sr.write(|w| w.sizerr().set_bit())
+        if flash.sr.read().sizerr().bit_is_set() {
+            hprintln!("sizerr error occured: {}", flash.sr.read().sizerr().bits()).unwrap();
+            flash.sr.write(|w| w.sizerr().set_bit())
         }
-        if self.flash.sr.read().pgaerr().bit_is_set() {
-            self.flash.sr.write(|w| w.pgaerr().set_bit())
+        if flash.sr.read().pgaerr().bit_is_set() {
+            hprintln!("pgaerr error occured: {}", flash.sr.read().pgaerr().bits()).unwrap();
+            flash.sr.write(|w| w.pgaerr().set_bit())
         }
-        if self.flash.sr.read().wrperr().bit_is_set() {
-            self.flash.sr.write(|w| w.wrperr().set_bit())
+        if flash.sr.read().wrperr().bit_is_set() {
+            hprintln!("wrperr error occured: {}", flash.sr.read().wrperr().bits()).unwrap();
+            flash.sr.write(|w| w.wrperr().set_bit())
         }
-        if self.flash.sr.read().progerr().bit_is_set() {
-            self.flash.sr.write(|w| w.progerr().set_bit())
+        if flash.sr.read().progerr().bit_is_set() {
+            hprintln!("progerr error occured: {}", flash.sr.read().progerr().bits()).unwrap();
+            flash.sr.write(|w| w.progerr().set_bit())
         }
-        if self.flash.sr.read().operr().bit_is_set() {
-            self.flash.sr.write(|w| w.operr().set_bit())
+        if flash.sr.read().operr().bit_is_set() {
+            hprintln!("operr error occured: {}", flash.sr.read().operr().bits()).unwrap();
+            flash.sr.write(|w| w.operr().set_bit())
         }
-        if self.flash.sr.read().eop().bit_is_set() {
-            self.flash.sr.write(|w| w.eop().set_bit())
+        if flash.sr.read().eop().bit_is_set() {
+            hprintln!("eop error occured: {}", flash.sr.read().eop().bits()).unwrap();
+            flash.sr.write(|w| w.eop().set_bit())
         }
     }
 }
