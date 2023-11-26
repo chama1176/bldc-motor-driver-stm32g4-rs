@@ -266,55 +266,35 @@ impl<'a> FrashStorage {
             None => (),
             Some(perip) => {
                 let flash = &perip.FLASH;
-                hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
-                // Unlocking the Flash memory
-                // Check BSY in FLASH_SR is not set.
-                while flash.sr.read().bsy().bit_is_set() {}
-                // 1. Write KEY1 = 0x45670123 in the Flash key register (FLASH_KEYR)
-                flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
-                // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
-                flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
-                hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                self.unlock_flash(&flash);
+                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
 
                 // Page erase
                 // Check BSY in FLASH_SR is not set.
                 while flash.sr.read().bsy().bit_is_set() {}
                 // Check and clear all error programming flags due to a previous programming. If not, PGSERR is set
                 self.check_and_clear_all_error(&flash);
-                // flash.sr.write(|w| unsafe { w.bits(0) });
-                // In dual bank mode (DBANK option bit is set),
-                // set the PER bit and select the page to erase (PNB)
-                // with the associated bank (BKER) in the Flash control register (FLASH_CR).
-                // flash.cr.write(|w| w.per().set_bit());
-
-                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
-                // flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
-                // // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
-                // flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
-                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
-                // flash.cr.write(|w| unsafe { w.pnb().bits(15) });
-
-                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
-                // flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
-                // // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
-                // flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
-                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
-
-
+                // In single bank mode (DBANK option bit is reset),
+                // set the PER bit and select the page to erase (PNB).
+                // The associated bank (BKER) in the Flash control register (FLASH_CR) must be kept cleared.
                 // Set the STRT bit in the FLASH_CR register.
+                // 一行で書かないとロックされてしまう
                 flash.cr.write(|w| unsafe {w.pnb().bits(15).per().set_bit().strt().set_bit()});
-                hprintln!("per bit: {}", flash.cr.read().per().bits()).unwrap();
-                hprintln!("pnb bit: {}", flash.cr.read().pnb().bits()).unwrap();
-                hprintln!("strt bit: {}", flash.cr.read().strt().bits()).unwrap();
+                // hprintln!("per bit: {}", flash.cr.read().per().bits()).unwrap();
+                // hprintln!("pnb bit: {}", flash.cr.read().pnb().bits()).unwrap();
+                // hprintln!("strt bit: {}", flash.cr.read().strt().bits()).unwrap();
                 //  Wait for the BSY bit to be cleared in the FLASH_SR register.
-                hprintln!("bsy bit: {}", flash.sr.read().bsy().bits()).unwrap();
                 while flash.sr.read().bsy().bit_is_set() {}
-                hprintln!("bsy bit: {}", flash.sr.read().bsy().bits()).unwrap();
+                // hprintln!("bsy bit: {}", flash.sr.read().bsy().bits()).unwrap();
 
                 // FLASH programming
                 // Check BSY in FLASH_SR is not set.
+                while flash.sr.read().bsy().bit_is_set() {}
                 // Check and clear all error programming flags due to a previous programming. If not, PGSERR is set
+                self.check_and_clear_all_error(&flash);
                 // Set the PG bit in the Flash control register (FLASH_CR)
+
                 // write double word 2 x 32bit
                 // write first word. -> write second word
                 //  Wait for the BSY bit to be cleared in the FLASH_SR register.
@@ -369,6 +349,15 @@ impl<'a> FrashStorage {
             hprintln!("eop error occured: {}", flash.sr.read().eop().bits()).unwrap();
             flash.sr.write(|w| w.eop().set_bit())
         }
+    }
+    fn unlock_flash(&self, flash: &FLASH) {
+        // Unlocking the Flash memory
+        // Check BSY in FLASH_SR is not set.
+        while flash.sr.read().bsy().bit_is_set() {}
+        // 1. Write KEY1 = 0x45670123 in the Flash key register (FLASH_KEYR)
+        flash.keyr.write(|w| unsafe { w.bits(0x45670123) });
+        // 2. Write KEY2 = 0xCDEF89AB in the FLASH_KEYR register.
+        flash.keyr.write(|w| unsafe { w.bits(0xCDEF89AB) });
     }
 }
 
