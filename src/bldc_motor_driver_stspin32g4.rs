@@ -294,13 +294,31 @@ impl<'a> FrashStorage {
                 // Check and clear all error programming flags due to a previous programming. If not, PGSERR is set
                 self.check_and_clear_all_error(&flash);
                 // Set the PG bit in the Flash control register (FLASH_CR)
-
+                // EOPはEOPIEがセットされているときのみ更新される
+                self.unlock_flash(&flash);
+                flash.cr.write(|w| w.pg().set_bit().eopie().set_bit());
+                hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
                 // write double word 2 x 32bit
                 // write first word. -> write second word
-                //  Wait for the BSY bit to be cleared in the FLASH_SR register.
+                let address = 0x0800_7800usize;
+                let r1 = address as *mut u32;
+                let r2 = (address+0x4) as *mut u32;
+                unsafe {
+                    *r1 = 0xCB;
+                    *r2 = 0xDA;
+                }
+                // Wait for the BSY bit to be cleared in the FLASH_SR register.
+                while flash.sr.read().bsy().bit_is_set() {}
                 // Check that EOP flag is set in the FLASH_SR register (meaning that the programming operation has succeed), and clear it by software.
+                while flash.sr.read().eop().bit_is_clear() {}
+                // Writing 1 to clear.
+                flash.sr.write(|w| w.eop().set_bit());
+                
 
                 // Clear the PG bit in the FLASH_CR register if there no more programming request anymore.
+                self.unlock_flash(&flash);
+                flash.cr.write(|w| w.pg().clear_bit());
+                hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
             }
         });
     }
