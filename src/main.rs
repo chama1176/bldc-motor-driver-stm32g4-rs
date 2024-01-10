@@ -98,8 +98,8 @@ fn main() -> ! {
     led1.init();
     let led2 = bldc_motor_driver_stspin32g4::Led2::new();
     led2.init();
-    let flash = bldc_motor_driver_stspin32g4::FrashStorage::new();
-    flash.write();
+    // let flash = bldc_motor_driver_stspin32g4::FrashStorage::new();
+    // flash.write();
 
     let app = app::App::new(led0, led1, led2, pwm, spi);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));

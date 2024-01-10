@@ -137,7 +137,7 @@ where
                 let ma = self.read_encoder_data();
                 let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
 
-                let tpv = DQVoltage{v_d:0.0, v_q:2.0}.to_three_phase(ea);
+                let tpv = DQVoltage{v_d:0.0, v_q:self.tv * 3.0}.to_three_phase(ea);
                 tp = ThreePhaseVoltage{
                     v_u: (tpv.v_u + 6.0) / 12.0,
                     v_v: (tpv.v_v + 6.0) / 12.0,
