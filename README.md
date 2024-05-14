@@ -1,4 +1,4 @@
-# BLDC Motor Driver for STSpin32G4 made from `cortex-m-quickstart`
+# BLDC Motor Driver for stm32G4 made from `cortex-m-quickstart`
 
 > A template for building applications for ARM Cortex-M microcontrollers
 
@@ -156,5 +156,5 @@ cargo run
 These command run openocd and connect to that, with gdb debugger.
 
 ## Memo
-- cargo readobj --bin bldc-motor-driver-stspin32g4 -- --file-headers
-- cargo size --bin bldc-motor-driver-stspin32g4 --release -- -A
+- cargo readobj --bin bldc-motor-driver-stm32g4 -- --file-headers
+- cargo size --bin bldc-motor-driver-stm32g4 --release -- -A

@@ -2,7 +2,7 @@
 authors = ["kaede <kaede6120@gmail.com>"]
 edition = "2018"
 readme = "README.md"
-name = "bldc-motor-driver-stspin32g4"
+name = "bldc-motor-driver-stm32g4"
 version = "0.1.0"
 
 [dependencies]
@@ -32,7 +32,7 @@ version = "0.14.0"
 
 # this lets you use `cargo fix`!
 [[bin]]
-name = "bldc-motor-driver-stspin32g4"
+name = "bldc-motor-driver-stm32g4"
 test = false
 bench = false
 

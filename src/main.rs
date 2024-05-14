@@ -18,7 +18,7 @@ use stm32g4::stm32g431::Interrupt::TIM3; // you can put a breakpoint on `rust_be
                                          // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
 mod app;
-mod bldc_motor_driver_stspin32g4;
+mod bldc_motor_driver_stm32g4;
 mod indicator;
 
 use motml::encoder::Encoder;
@@ -29,11 +29,11 @@ static G_APP: Mutex<
     RefCell<
         Option<
             app::App<
-                bldc_motor_driver_stspin32g4::Led0,
-                bldc_motor_driver_stspin32g4::Led1,
-                bldc_motor_driver_stspin32g4::Led2,
-                bldc_motor_driver_stspin32g4::BldcPwm,
-                bldc_motor_driver_stspin32g4::Spi3,
+                bldc_motor_driver_stm32g4::Led0,
+                bldc_motor_driver_stm32g4::Led1,
+                bldc_motor_driver_stm32g4::Led2,
+                bldc_motor_driver_stm32g4::BldcPwm,
+                bldc_motor_driver_stm32g4::Spi3,
             >,
         >,
     >,
@@ -46,7 +46,7 @@ fn TIM3() {
     *COUNT += 1;
 
     free(|cs| {
-        match bldc_motor_driver_stspin32g4::G_PERIPHERAL
+        match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
             .borrow()
             .as_ref()
@@ -75,30 +75,30 @@ fn main() -> ! {
     let perip = stm32g431::Peripherals::take().unwrap();
     let mut core_perip = stm32g431::CorePeripherals::take().unwrap();
 
-    bldc_motor_driver_stspin32g4::clock_init(&perip, &mut core_perip);
-    bldc_motor_driver_stspin32g4::adc2_init(&perip);
+    bldc_motor_driver_stm32g4::clock_init(&perip, &mut core_perip);
+    bldc_motor_driver_stm32g4::adc2_init(&perip);
     let adc_data: [u16; 7] = [77; 7];
     let dma_buf_addr: u32 = adc_data.as_ptr() as u32;
-    bldc_motor_driver_stspin32g4::dma_init(&perip, &mut core_perip, dma_buf_addr);
-    bldc_motor_driver_stspin32g4::dma_adc2_start(&perip);
+    bldc_motor_driver_stm32g4::dma_init(&perip, &mut core_perip, dma_buf_addr);
+    bldc_motor_driver_stm32g4::dma_adc2_start(&perip);
 
-    bldc_motor_driver_stspin32g4::init_g_peripheral(perip);
+    bldc_motor_driver_stm32g4::init_g_peripheral(perip);
 
-    let mut uart = bldc_motor_driver_stspin32g4::Uart1::new();
+    let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
     uart.init();
-    let pwm = bldc_motor_driver_stspin32g4::BldcPwm::new();
+    let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
     pwm.init();
 
-    let spi = bldc_motor_driver_stspin32g4::Spi3::new();
+    let spi = bldc_motor_driver_stm32g4::Spi3::new();
     spi.init();
     spi.reset_error();
-    let led0 = bldc_motor_driver_stspin32g4::Led0::new();
+    let led0 = bldc_motor_driver_stm32g4::Led0::new();
     led0.init();
-    let led1 = bldc_motor_driver_stspin32g4::Led1::new();
+    let led1 = bldc_motor_driver_stm32g4::Led1::new();
     led1.init();
-    let led2 = bldc_motor_driver_stspin32g4::Led2::new();
+    let led2 = bldc_motor_driver_stm32g4::Led2::new();
     led2.init();
-    // let flash = bldc_motor_driver_stspin32g4::FrashStorage::new();
+    // let flash = bldc_motor_driver_stm32g4::FrashStorage::new();
     // flash.write();
 
     let app = app::App::new(led0, led1, led2, pwm, spi);
@@ -106,7 +106,7 @@ fn main() -> ! {
 
     let mut t = 0;
     free(|cs| {
-        match bldc_motor_driver_stspin32g4::G_PERIPHERAL
+        match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
             .borrow()
             .as_ref()
@@ -122,7 +122,7 @@ fn main() -> ! {
 
     loop {
         free(|cs| {
-            match bldc_motor_driver_stspin32g4::G_PERIPHERAL
+            match bldc_motor_driver_stm32g4::G_PERIPHERAL
                 .borrow(cs)
                 .borrow()
                 .as_ref()
