@@ -21,6 +21,8 @@ mod app;
 mod bldc_motor_driver_stm32g4;
 mod indicator;
 
+use crate::indicator::Indicator;
+
 use motml::encoder::Encoder;
 use motml::motor_driver;
 use motml::utils::Deg;
@@ -31,9 +33,9 @@ static G_APP: Mutex<
             app::App<
                 bldc_motor_driver_stm32g4::Led0,
                 bldc_motor_driver_stm32g4::Led1,
-                bldc_motor_driver_stm32g4::Led2,
-                bldc_motor_driver_stm32g4::BldcPwm,
-                bldc_motor_driver_stm32g4::Spi3,
+                // bldc_motor_driver_stm32g4::Led2,
+                // bldc_motor_driver_stm32g4::BldcPwm,
+                // bldc_motor_driver_stm32g4::Spi3,
             >,
         >,
     >,
@@ -60,7 +62,7 @@ fn TIM3() {
             None => (),
             Some(app) => {
                 app.set_count(COUNT.clone());
-                app.periodic_task();
+                // app.periodic_task();
             }
         }
     });
@@ -86,22 +88,22 @@ fn main() -> ! {
 
     let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
     uart.init();
-    let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
-    pwm.init();
+    // let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
+    // pwm.init();
 
-    let spi = bldc_motor_driver_stm32g4::Spi3::new();
-    spi.init();
-    spi.reset_error();
+    // let spi = bldc_motor_driver_stm32g4::Spi3::new();
+    // spi.init();
+    // spi.reset_error();
     let led0 = bldc_motor_driver_stm32g4::Led0::new();
     led0.init();
+    // led0.on();
     let led1 = bldc_motor_driver_stm32g4::Led1::new();
     led1.init();
-    let led2 = bldc_motor_driver_stm32g4::Led2::new();
-    led2.init();
+    // led1.on();
     // let flash = bldc_motor_driver_stm32g4::FrashStorage::new();
     // flash.write();
 
-    let app = app::App::new(led0, led1, led2, pwm, spi);
+    let app = app::App::new(led0, led1 /*pwm, spi*/);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
 
     let mut t = 0;
@@ -138,7 +140,6 @@ fn main() -> ! {
             cnt += 1;
             if cnt > 5000 {
                 // hprintln!("t: {}", t).unwrap();
-                // app.periodic_task();
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 write!(
@@ -164,6 +165,7 @@ fn main() -> ! {
                 free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
                     None => (),
                     Some(app) => {
+                        app.periodic_task();
                         app.set_target_velocity(tv);
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();

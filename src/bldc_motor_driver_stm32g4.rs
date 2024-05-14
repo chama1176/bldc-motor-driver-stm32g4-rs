@@ -21,6 +21,14 @@ use motml::motor_driver::ThreePhaseValue;
 use motml::motor_driver::ThreePhaseVoltage;
 use motml::utils::Deg;
 
+
+pub static G_PERIPHERAL: Mutex<RefCell<Option<stm32g4::stm32g431::Peripherals>>> =
+    Mutex::new(RefCell::new(None));
+
+pub fn init_g_peripheral(perip: Peripherals) {
+    free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
+}
+
 pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
     perip.RCC.cr.modify(|_, w| w.hseon().on());
@@ -151,6 +159,7 @@ pub fn adc2_init(perip: &Peripherals) {
     // GPIOポートの電源投入(クロックの有効化)
     perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
     perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+    perip.RCC.ahb2enr.modify(|_, w| w.gpiofen().set_bit());
 
     perip.RCC.ahb2enr.modify(|_, w| w.adc12en().set_bit());
     perip.RCC.ccipr.modify(|_, w| w.adc12sel().system()); // clock source setting
@@ -158,12 +167,13 @@ pub fn adc2_init(perip: &Peripherals) {
     // gpioモード変更
     perip.GPIOA.moder.modify(|_, w| w.moder0().analog());
     perip.GPIOA.moder.modify(|_, w| w.moder6().analog());
-    perip.GPIOA.moder.modify(|_, w| w.moder7().analog());
 
     perip.GPIOC.moder.modify(|_, w| w.moder0().analog());
     perip.GPIOC.moder.modify(|_, w| w.moder1().analog());
     perip.GPIOC.moder.modify(|_, w| w.moder2().analog());
     perip.GPIOC.moder.modify(|_, w| w.moder3().analog());
+
+    perip.GPIOF.moder.modify(|_, w| w.moder1().analog());
 
     let adc = &perip.ADC2;
     adc.cfgr.modify(|_, w| w.res().bits12()); // Resolution setting
@@ -205,30 +215,30 @@ pub fn adc2_init(perip: &Peripherals) {
     adc.cr.modify(|_, w| w.adcal().calibration()); // Start calibration
     while !adc.cr.read().adcal().is_complete() {} // Wait for calibration complete
 
-    // 1: Current W
-    // 3: 1.5V Ref
-    // 4: Current V
-    // 6: Temp Coil
-    // 7: AD0
+    // 1: Battery Voltage
+    // 3: AD0
+    // 6: Current U
+    // 7: Current V
     // 8: Temp FET
-    // 9: Battery Voltage
+    // 9: Temp Coil
+    // 10: 1.5V Ref
 
     adc.smpr1.modify(|_, w| w.smp1().cycles24_5()); // sampling time selection
     adc.smpr1.modify(|_, w| w.smp3().cycles24_5()); // sampling time selection
-    adc.smpr1.modify(|_, w| w.smp4().cycles24_5()); // sampling time selection
     adc.smpr1.modify(|_, w| w.smp6().cycles24_5()); // sampling time selection
     adc.smpr1.modify(|_, w| w.smp7().cycles24_5()); // sampling time selection
     adc.smpr1.modify(|_, w| w.smp8().cycles24_5()); // sampling time selection
     adc.smpr1.modify(|_, w| w.smp9().cycles24_5()); // sampling time selection
+    adc.smpr2.modify(|_, w| w.smp10().cycles24_5()); // sampling time selection
 
     adc.sqr1.modify(|_, w| w.l().bits(7 - 1)); // Regular channel sequence length. 0 means 1 length
     adc.sqr1.modify(|_, w| unsafe { w.sq1().bits(1) }); // 1st conversion in regular sequence
     adc.sqr1.modify(|_, w| unsafe { w.sq2().bits(3) }); // 1st conversion in regular sequence
-    adc.sqr1.modify(|_, w| unsafe { w.sq3().bits(4) }); // 1st conversion in regular sequence
-    adc.sqr1.modify(|_, w| unsafe { w.sq4().bits(6) }); // 1st conversion in regular sequence
-    adc.sqr2.modify(|_, w| unsafe { w.sq5().bits(7) }); // 1st conversion in regular sequence
-    adc.sqr2.modify(|_, w| unsafe { w.sq6().bits(8) }); // 1st conversion in regular sequence
-    adc.sqr2.modify(|_, w| unsafe { w.sq7().bits(9) }); // 1st conversion in regular sequence
+    adc.sqr1.modify(|_, w| unsafe { w.sq3().bits(6) }); // 1st conversion in regular sequence
+    adc.sqr1.modify(|_, w| unsafe { w.sq4().bits(7) }); // 1st conversion in regular sequence
+    adc.sqr2.modify(|_, w| unsafe { w.sq5().bits(8) }); // 1st conversion in regular sequence
+    adc.sqr2.modify(|_, w| unsafe { w.sq6().bits(9) }); // 1st conversion in regular sequence
+    adc.sqr2.modify(|_, w| unsafe { w.sq7().bits(10) }); // 1st conversion in regular sequence
 }
 
 pub fn dma_adc2_start(perip: &Peripherals) {
@@ -249,12 +259,6 @@ pub fn dma_adc2_start(perip: &Peripherals) {
     adc.cr.modify(|_, w| w.adstart().start()); // ADC start
 }
 
-pub static G_PERIPHERAL: Mutex<RefCell<Option<stm32g4::stm32g431::Peripherals>>> =
-    Mutex::new(RefCell::new(None));
-
-pub fn init_g_peripheral(perip: Peripherals) {
-    free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
-}
 
 pub struct FrashStorage {}
 impl<'a> FrashStorage {
@@ -402,11 +406,11 @@ impl<'a> Uart1 {
                 perip.RCC.apb2enr.modify(|_, w| w.usart1en().enabled());
 
                 // gpioモード変更
-                let gpioc = &perip.GPIOC;
-                gpioc.moder.modify(|_, w| w.moder4().alternate());
-                gpioc.moder.modify(|_, w| w.moder5().alternate());
-                gpioc.afrl.modify(|_, w| w.afrl4().af7());
-                gpioc.afrl.modify(|_, w| w.afrl5().af7());
+                let gpio = &perip.GPIOC;
+                gpio.moder.modify(|_, w| w.moder4().alternate());
+                gpio.moder.modify(|_, w| w.moder5().alternate());
+                gpio.afrl.modify(|_, w| w.afrl4().af7());
+                gpio.afrl.modify(|_, w| w.afrl5().af7());
 
                 let uart = &perip.USART1;
                 // Set over sampling mode
@@ -446,368 +450,368 @@ impl<'a> Uart1 {
     }
 }
 
-pub struct Spi3 {}
-impl Spi3 {
-    pub fn new() -> Self {
-        Self {}
-    }
-    pub fn init(&self) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                // GPIOポートの電源投入(クロックの有効化)
-                perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
-                perip.RCC.apb1enr1.modify(|_, w| w.spi3en().enabled());
+// pub struct Spi3 {}
+// impl Spi3 {
+//     pub fn new() -> Self {
+//         Self {}
+//     }
+//     pub fn init(&self) {
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 // GPIOポートの電源投入(クロックの有効化)
+//                 perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
+//                 perip.RCC.apb1enr1.modify(|_, w| w.spi3en().enabled());
 
-                // gpioモード変更
-                let gpiob = &perip.GPIOB;
-                gpiob.moder.modify(|_, w| w.moder6().output()); // CS pin
-                gpiob.moder.modify(|_, w| w.moder5().alternate());
-                gpiob.moder.modify(|_, w| w.moder4().alternate());
-                gpiob.moder.modify(|_, w| w.moder3().alternate());
-                gpiob.afrl.modify(|_, w| w.afrl5().af6());
-                gpiob.afrl.modify(|_, w| w.afrl4().af6());
-                gpiob.afrl.modify(|_, w| w.afrl3().af6());
-                gpiob.ospeedr.modify(|_, w| w.ospeedr6().very_high_speed()); // CS pin
-                gpiob.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
-                gpiob.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
-                gpiob.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
-                gpiob.otyper.modify(|_, w| w.ot6().push_pull()); // CS pin
+//                 // gpioモード変更
+//                 let gpiob = &perip.GPIOB;
+//                 gpiob.moder.modify(|_, w| w.moder6().output()); // CS pin
+//                 gpiob.moder.modify(|_, w| w.moder5().alternate());
+//                 gpiob.moder.modify(|_, w| w.moder4().alternate());
+//                 gpiob.moder.modify(|_, w| w.moder3().alternate());
+//                 gpiob.afrl.modify(|_, w| w.afrl5().af6());
+//                 gpiob.afrl.modify(|_, w| w.afrl4().af6());
+//                 gpiob.afrl.modify(|_, w| w.afrl3().af6());
+//                 gpiob.ospeedr.modify(|_, w| w.ospeedr6().very_high_speed()); // CS pin
+//                 gpiob.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+//                 gpiob.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+//                 gpiob.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+//                 gpiob.otyper.modify(|_, w| w.ot6().push_pull()); // CS pin
 
-                let spi = &perip.SPI3;
-                spi.cr1.modify(|_, w| w.spe().clear_bit());
+//                 let spi = &perip.SPI3;
+//                 spi.cr1.modify(|_, w| w.spe().clear_bit());
 
-                // Set Baudrate
-                spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
+//                 // Set Baudrate
+//                 spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
 
-                // Set Clock polarity
-                spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low
+//                 // Set Clock polarity
+//                 spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low
 
-                // Set Clock phase
-                spi.cr1.modify(|_, w| w.cpha().set_bit()); // second edge(down edge in-case idle is low)
+//                 // Set Clock phase
+//                 spi.cr1.modify(|_, w| w.cpha().set_bit()); // second edge(down edge in-case idle is low)
 
-                // Bidirectional data mode enable(half-duplex communication)
-                spi.cr1.modify(|_, w| w.bidimode().clear_bit());
-                // Set MSL LSB first
-                spi.cr1.modify(|_, w| w.lsbfirst().clear_bit());
-                // Set NSS management
-                // Soft ware slave management
-                spi.cr1.modify(|_, w| w.ssm().set_bit());
-                // Internal slave select
-                spi.cr1.modify(|_, w| w.ssi().set_bit());
-                // Master configuration
-                spi.cr1.modify(|_, w| w.mstr().set_bit());
+//                 // Bidirectional data mode enable(half-duplex communication)
+//                 spi.cr1.modify(|_, w| w.bidimode().clear_bit());
+//                 // Set MSL LSB first
+//                 spi.cr1.modify(|_, w| w.lsbfirst().clear_bit());
+//                 // Set NSS management
+//                 // Soft ware slave management
+//                 spi.cr1.modify(|_, w| w.ssm().set_bit());
+//                 // Internal slave select
+//                 spi.cr1.modify(|_, w| w.ssi().set_bit());
+//                 // Master configuration
+//                 spi.cr1.modify(|_, w| w.mstr().set_bit());
 
-                // Data size
-                spi.cr2.modify(|_, w| unsafe { w.ds().bits(0b1111) }); // 16bit
+//                 // Data size
+//                 spi.cr2.modify(|_, w| unsafe { w.ds().bits(0b1111) }); // 16bit
 
-                // SS output
-                spi.cr2.modify(|_, w| w.ssoe().clear_bit());
-                // Frame format
-                spi.cr2.modify(|_, w| w.frf().clear_bit()); // Motorola mode
+//                 // SS output
+//                 spi.cr2.modify(|_, w| w.ssoe().clear_bit());
+//                 // Frame format
+//                 spi.cr2.modify(|_, w| w.frf().clear_bit()); // Motorola mode
 
-                // NSS pulse management
-                spi.cr2.modify(|_, w| w.nssp().set_bit());
-                //
-                spi.cr1.modify(|_, w| w.spe().set_bit());
-            }
-        });
-    }
-    pub fn txrx(&self, c: u16) -> Option<u16> {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => None,
-            Some(perip) => {
-                let gpiob = &perip.GPIOB;
-                gpiob.bsrr.write(|w| w.br6().reset());
-                let spi = &perip.SPI3;
+//                 // NSS pulse management
+//                 spi.cr2.modify(|_, w| w.nssp().set_bit());
+//                 //
+//                 spi.cr1.modify(|_, w| w.spe().set_bit());
+//             }
+//         });
+//     }
+//     pub fn txrx(&self, c: u16) -> Option<u16> {
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => None,
+//             Some(perip) => {
+//                 let gpiob = &perip.GPIOB;
+//                 gpiob.bsrr.write(|w| w.br6().reset());
+//                 let spi = &perip.SPI3;
 
-                while spi.sr.read().txe().bit_is_clear() {}
-                // send 8bit data automatically 2 times
-                spi.dr.modify(|_, w| unsafe { w.dr().bits(c.into()) });
+//                 while spi.sr.read().txe().bit_is_clear() {}
+//                 // send 8bit data automatically 2 times
+//                 spi.dr.modify(|_, w| unsafe { w.dr().bits(c.into()) });
 
-                while spi.sr.read().bsy().bit_is_set() {}
-                while spi.sr.read().rxne().bit_is_clear() {}
-                gpiob.bsrr.write(|w| w.bs6().set());
+//                 while spi.sr.read().bsy().bit_is_set() {}
+//                 while spi.sr.read().rxne().bit_is_clear() {}
+//                 gpiob.bsrr.write(|w| w.bs6().set());
 
-                let data = spi.dr.read().dr().bits();
-                // hprintln!("dr: {:x}", data).unwrap();
-                Some(data & 0x3FFF)
-            }
-        })
-    }
-}
-impl Encoder<f32> for Spi3 {
-    fn get_angle(&self) -> Option<f32> {
-        let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
-        let p: u16 = data.count_ones() as u16 % 2; // parity
-        self.txrx(data | (p << 15));
-        match self.txrx(data | (p << 15)) {
-            None => None,
-            Some(data) => {
-                let deg = data as f32 / 16384.0 * 360.0;
-                return Some(deg.invert_360().deg2rad());
-            }
-        }
-    }
-    fn reset_error(&self) {
-        // clear error
-        let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
-        let p: u16 = data.count_ones() as u16 % 2;
-        self.txrx(data | (p << 15));
-    }
-}
+//                 let data = spi.dr.read().dr().bits();
+//                 // hprintln!("dr: {:x}", data).unwrap();
+//                 Some(data & 0x3FFF)
+//             }
+//         })
+//     }
+// }
+// impl Encoder<f32> for Spi3 {
+//     fn get_angle(&self) -> Option<f32> {
+//         let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
+//         let p: u16 = data.count_ones() as u16 % 2; // parity
+//         self.txrx(data | (p << 15));
+//         match self.txrx(data | (p << 15)) {
+//             None => None,
+//             Some(data) => {
+//                 let deg = data as f32 / 16384.0 * 360.0;
+//                 return Some(deg.invert_360().deg2rad());
+//             }
+//         }
+//     }
+//     fn reset_error(&self) {
+//         // clear error
+//         let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
+//         let p: u16 = data.count_ones() as u16 % 2;
+//         self.txrx(data | (p << 15));
+//     }
+// }
 
-pub struct BldcPwm {}
-impl<'a> BldcPwm {
-    pub fn new() -> Self {
-        Self {}
-    }
-    pub fn init(&self) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                // GPIOポートの電源投入(クロックの有効化)
-                perip.RCC.ahb2enr.modify(|_, w| w.gpioeen().set_bit());
-                perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+// pub struct BldcPwm {}
+// impl<'a> BldcPwm {
+//     pub fn new() -> Self {
+//         Self {}
+//     }
+//     pub fn init(&self) {
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 // GPIOポートの電源投入(クロックの有効化)
+//                 perip.RCC.ahb2enr.modify(|_, w| w.gpioeen().set_bit());
+//                 perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
 
-                // gpioモード変更
-                // I2C
-                let gpioc = &perip.GPIOC;
-                gpioc.otyper.modify(|_, w| w.ot8().open_drain());
-                gpioc.otyper.modify(|_, w| w.ot9().open_drain());
-                gpioc.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
-                gpioc.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
-                gpioc.moder.modify(|_, w| w.moder8().alternate());
-                gpioc.moder.modify(|_, w| w.moder9().alternate());
-                gpioc.afrh.modify(|_, w| w.afrh8().af8());
-                gpioc.afrh.modify(|_, w| w.afrh9().af8());
-                // IO pin
-                let gpio = &perip.GPIOE;
-                gpio.moder.modify(|_, w| w.moder7().output());
-                gpio.moder.modify(|_, w| w.moder14().input());
-                gpio.moder.modify(|_, w| w.moder15().input());
-                // PWM pin
-                gpio.moder.modify(|_, w| w.moder8().alternate());
-                gpio.moder.modify(|_, w| w.moder9().alternate());
-                gpio.moder.modify(|_, w| w.moder10().alternate());
-                gpio.moder.modify(|_, w| w.moder11().alternate());
-                gpio.moder.modify(|_, w| w.moder12().alternate());
-                gpio.moder.modify(|_, w| w.moder13().alternate());
-                gpio.afrh.modify(|_, w| w.afrh8().af2());
-                gpio.afrh.modify(|_, w| w.afrh9().af2());
-                gpio.afrh.modify(|_, w| w.afrh10().af2());
-                gpio.afrh.modify(|_, w| w.afrh11().af2());
-                gpio.afrh.modify(|_, w| w.afrh12().af2());
-                gpio.afrh.modify(|_, w| w.afrh13().af2());
-                gpio.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
-                gpio.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
-                gpio.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
-                gpio.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
-                gpio.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
-                gpio.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
+//                 // gpioモード変更
+//                 // I2C
+//                 let gpioc = &perip.GPIOC;
+//                 gpioc.otyper.modify(|_, w| w.ot8().open_drain());
+//                 gpioc.otyper.modify(|_, w| w.ot9().open_drain());
+//                 gpioc.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+//                 gpioc.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+//                 gpioc.moder.modify(|_, w| w.moder8().alternate());
+//                 gpioc.moder.modify(|_, w| w.moder9().alternate());
+//                 gpioc.afrh.modify(|_, w| w.afrh8().af8());
+//                 gpioc.afrh.modify(|_, w| w.afrh9().af8());
+//                 // IO pin
+//                 let gpio = &perip.GPIOE;
+//                 gpio.moder.modify(|_, w| w.moder7().output());
+//                 gpio.moder.modify(|_, w| w.moder14().input());
+//                 gpio.moder.modify(|_, w| w.moder15().input());
+//                 // PWM pin
+//                 gpio.moder.modify(|_, w| w.moder8().alternate());
+//                 gpio.moder.modify(|_, w| w.moder9().alternate());
+//                 gpio.moder.modify(|_, w| w.moder10().alternate());
+//                 gpio.moder.modify(|_, w| w.moder11().alternate());
+//                 gpio.moder.modify(|_, w| w.moder12().alternate());
+//                 gpio.moder.modify(|_, w| w.moder13().alternate());
+//                 gpio.afrh.modify(|_, w| w.afrh8().af2());
+//                 gpio.afrh.modify(|_, w| w.afrh9().af2());
+//                 gpio.afrh.modify(|_, w| w.afrh10().af2());
+//                 gpio.afrh.modify(|_, w| w.afrh11().af2());
+//                 gpio.afrh.modify(|_, w| w.afrh12().af2());
+//                 gpio.afrh.modify(|_, w| w.afrh13().af2());
+//                 gpio.ospeedr.modify(|_, w| w.ospeedr8().very_high_speed());
+//                 gpio.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed());
+//                 gpio.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+//                 gpio.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
+//                 gpio.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+//                 gpio.ospeedr.modify(|_, w| w.ospeedr13().very_high_speed());
 
-                perip.RCC.ccipr.modify(|_, w| w.i2c3sel().pclk());
-                perip.RCC.apb1enr1.modify(|_, w| w.i2c3en().enabled());
-                perip.RCC.apb2enr.modify(|_, w| w.tim1en().enabled());
+//                 perip.RCC.ccipr.modify(|_, w| w.i2c3sel().pclk());
+//                 perip.RCC.apb1enr1.modify(|_, w| w.i2c3en().enabled());
+//                 perip.RCC.apb2enr.modify(|_, w| w.tim1en().enabled());
 
-                let i2c = &perip.I2C3;
-                i2c.cr1.modify(|_, w| w.pe().clear_bit());
+//                 let i2c = &perip.I2C3;
+//                 i2c.cr1.modify(|_, w| w.pe().clear_bit());
 
-                i2c.cr1.modify(|_, w| w.anfoff().disabled());
-                i2c.cr1.modify(|_, w| w.dnf().no_filter());
-                // 140MHz, presc:14-1->10MHz, t=100ns
-                i2c.timingr.modify(|_, w| w.presc().bits(14 - 1));
-                i2c.timingr.modify(|_, w| w.scll().bits(50 - 1)); // t_SCLL 5000ns
-                i2c.timingr.modify(|_, w| w.sclh().bits(40 - 1)); // t_SCLH 4000ns
-                i2c.timingr.modify(|_, w| w.sdadel().bits(5)); // 500ns
-                i2c.timingr.modify(|_, w| w.scldel().bits(12 - 1)); // 1200ns
+//                 i2c.cr1.modify(|_, w| w.anfoff().disabled());
+//                 i2c.cr1.modify(|_, w| w.dnf().no_filter());
+//                 // 140MHz, presc:14-1->10MHz, t=100ns
+//                 i2c.timingr.modify(|_, w| w.presc().bits(14 - 1));
+//                 i2c.timingr.modify(|_, w| w.scll().bits(50 - 1)); // t_SCLL 5000ns
+//                 i2c.timingr.modify(|_, w| w.sclh().bits(40 - 1)); // t_SCLH 4000ns
+//                 i2c.timingr.modify(|_, w| w.sdadel().bits(5)); // 500ns
+//                 i2c.timingr.modify(|_, w| w.scldel().bits(12 - 1)); // 1200ns
 
-                i2c.cr1.modify(|_, w| w.nostretch().disabled());
+//                 i2c.cr1.modify(|_, w| w.nostretch().disabled());
 
-                // Peripheral enable
-                i2c.cr1.modify(|_, w| w.pe().set_bit());
+//                 // Peripheral enable
+//                 i2c.cr1.modify(|_, w| w.pe().set_bit());
 
-                // For PWM
-                let tim = &perip.TIM1;
-                tim.psc.modify(|_, w| unsafe { w.bits(7 - 1) });
-                tim.arr.modify(|_, w| unsafe { w.bits(800 - 1) }); // 25kHz
-                                                                   // tim.dier.modify(|_, w| w.uie().set_bit());
+//                 // For PWM
+//                 let tim = &perip.TIM1;
+//                 tim.psc.modify(|_, w| unsafe { w.bits(7 - 1) });
+//                 tim.arr.modify(|_, w| unsafe { w.bits(800 - 1) }); // 25kHz
+//                                                                    // tim.dier.modify(|_, w| w.uie().set_bit());
 
-                // OCxM mode
-                tim.ccmr1_output().modify(|_, w| w.oc1m().pwm_mode1());
-                tim.ccmr1_output().modify(|_, w| w.oc2m().pwm_mode1());
-                tim.ccmr2_output().modify(|_, w| w.oc3m().pwm_mode1());
-                // CCRx
-                tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
-                tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
-                tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
-                                                                    // CCxIE enable interrupt request
+//                 // OCxM mode
+//                 tim.ccmr1_output().modify(|_, w| w.oc1m().pwm_mode1());
+//                 tim.ccmr1_output().modify(|_, w| w.oc2m().pwm_mode1());
+//                 tim.ccmr2_output().modify(|_, w| w.oc3m().pwm_mode1());
+//                 // CCRx
+//                 tim.ccr1.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
+//                 tim.ccr2.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
+//                 tim.ccr3.modify(|_, w| unsafe { w.ccr().bits(0) }); // x/800
+//                                                                     // CCxIE enable interrupt request
 
-                // Set polarity
-                // tim.ccer.modify(|_, w| w.cc1p().clear_bit());
-                // tim.ccer.modify(|_, w| w.cc1np().clear_bit());
-                // PWM mode
-                // tim.cr1.modify(|_, w| unsafe { w.cms().bits(0b00) });
+//                 // Set polarity
+//                 // tim.ccer.modify(|_, w| w.cc1p().clear_bit());
+//                 // tim.ccer.modify(|_, w| w.cc1np().clear_bit());
+//                 // PWM mode
+//                 // tim.cr1.modify(|_, w| unsafe { w.cms().bits(0b00) });
 
-                // enable tim
-                tim.cr1.modify(|_, w| w.cen().set_bit());
-                // BDTR break and dead-time register
-                tim.bdtr.modify(|_, w| w.moe().set_bit());
-                // CCxE enable output
-                tim.ccer.modify(|_, w| w.cc1e().set_bit());
-                tim.ccer.modify(|_, w| w.cc1ne().set_bit());
-                tim.ccer.modify(|_, w| w.cc2e().set_bit());
-                tim.ccer.modify(|_, w| w.cc2ne().set_bit());
-                tim.ccer.modify(|_, w| w.cc3e().set_bit());
-                tim.ccer.modify(|_, w| w.cc3ne().set_bit());
+//                 // enable tim
+//                 tim.cr1.modify(|_, w| w.cen().set_bit());
+//                 // BDTR break and dead-time register
+//                 tim.bdtr.modify(|_, w| w.moe().set_bit());
+//                 // CCxE enable output
+//                 tim.ccer.modify(|_, w| w.cc1e().set_bit());
+//                 tim.ccer.modify(|_, w| w.cc1ne().set_bit());
+//                 tim.ccer.modify(|_, w| w.cc2e().set_bit());
+//                 tim.ccer.modify(|_, w| w.cc2ne().set_bit());
+//                 tim.ccer.modify(|_, w| w.cc3e().set_bit());
+//                 tim.ccer.modify(|_, w| w.cc3ne().set_bit());
 
-                // Wait for ready
-                while gpio.idr.read().idr14().is_low() && gpio.idr.read().idr15().is_high() {}
+//                 // Wait for ready
+//                 while gpio.idr.read().idr14().is_low() && gpio.idr.read().idr15().is_high() {}
 
-                // Unlock protected register.
-                Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x0F]);
-                // Set gate drive voltage
-                Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x00]);
-                // Lock protected register.
-                Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x00]);
-                // Clear Fault.
-                Self::write_2byte_i2c(&perip, 0x47, &[0x09, 0xFF]);
+//                 // Unlock protected register.
+//                 Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x0F]);
+//                 // Set gate drive voltage
+//                 Self::write_2byte_i2c(&perip, 0x47, &[0x01, 0x00]);
+//                 // Lock protected register.
+//                 Self::write_2byte_i2c(&perip, 0x47, &[0x0B, 0x00]);
+//                 // Clear Fault.
+//                 Self::write_2byte_i2c(&perip, 0x47, &[0x09, 0xFF]);
 
-                // Wake up
-                gpio.bsrr.write(|w| w.bs7().set());
-            }
-        });
-    }
-    pub fn get_nfault_status(&self) -> bool {
-        let mut result = false;
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let gpio = &perip.GPIOE;
-                result = gpio.idr.read().idr15().is_high();
-            }
-        });
-        result
-    }
-    pub fn get_ready_status(&self) -> bool {
-        let mut result = false;
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let gpio = &perip.GPIOE;
-                result = gpio.idr.read().idr14().is_high();
-            }
-        });
-        result
-    }
-    /// Write 'data' to 'address's slave
-    fn write_2byte_i2c(perip: &Peripherals, address: u16, data: &[u8]) {
-        if data.len() != 2 {
-            return;
-        }
+//                 // Wake up
+//                 gpio.bsrr.write(|w| w.bs7().set());
+//             }
+//         });
+//     }
+//     pub fn get_nfault_status(&self) -> bool {
+//         let mut result = false;
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 let gpio = &perip.GPIOE;
+//                 result = gpio.idr.read().idr15().is_high();
+//             }
+//         });
+//         result
+//     }
+//     pub fn get_ready_status(&self) -> bool {
+//         let mut result = false;
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 let gpio = &perip.GPIOE;
+//                 result = gpio.idr.read().idr14().is_high();
+//             }
+//         });
+//         result
+//     }
+//     /// Write 'data' to 'address's slave
+//     fn write_2byte_i2c(perip: &Peripherals, address: u16, data: &[u8]) {
+//         if data.len() != 2 {
+//             return;
+//         }
 
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let i2c = &perip.I2C3;
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 let i2c = &perip.I2C3;
 
-                i2c.cr2.modify(|_, w| w.nbytes().bits(2));
-                // Address
-                i2c.cr2.modify(|_, w| w.sadd().bits(address << 1)); // 1000111
-                i2c.cr2.modify(|_, w| w.add10().bit7());
-                // Transfer direction
-                i2c.cr2.modify(|_, w| w.rd_wrn().write());
-                i2c.cr2.modify(|_, w| w.autoend().clear_bit());
-                i2c.cr2.modify(|_, w| w.reload().clear_bit());
-                while i2c.cr2.read().start().bit_is_set() {}
-                i2c.cr2.modify(|_, w| w.start().set_bit());
-                while i2c.isr.read().txis().bit_is_clear() {
-                    // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-                    // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-                    // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-                }
-                i2c.txdr.modify(|_, w| w.txdata().bits(data[0]));
-                while i2c.isr.read().txis().bit_is_clear() {
-                    // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-                    // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-                    // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
-                }
-                i2c.txdr.modify(|_, w| w.txdata().bits(data[1]));
+//                 i2c.cr2.modify(|_, w| w.nbytes().bits(2));
+//                 // Address
+//                 i2c.cr2.modify(|_, w| w.sadd().bits(address << 1)); // 1000111
+//                 i2c.cr2.modify(|_, w| w.add10().bit7());
+//                 // Transfer direction
+//                 i2c.cr2.modify(|_, w| w.rd_wrn().write());
+//                 i2c.cr2.modify(|_, w| w.autoend().clear_bit());
+//                 i2c.cr2.modify(|_, w| w.reload().clear_bit());
+//                 while i2c.cr2.read().start().bit_is_set() {}
+//                 i2c.cr2.modify(|_, w| w.start().set_bit());
+//                 while i2c.isr.read().txis().bit_is_clear() {
+//                     // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
+//                     // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
+//                     // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+//                 }
+//                 i2c.txdr.modify(|_, w| w.txdata().bits(data[0]));
+//                 while i2c.isr.read().txis().bit_is_clear() {
+//                     // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
+//                     // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
+//                     // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+//                 }
+//                 i2c.txdr.modify(|_, w| w.txdata().bits(data[1]));
 
-                while i2c.isr.read().tc().bit_is_clear() {
-                    // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-                    // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
-                }
-                i2c.cr2.modify(|_, w| w.stop().stop());
-            }
-        });
-    }
-}
+//                 while i2c.isr.read().tc().bit_is_clear() {
+//                     // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
+//                     // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
+//                 }
+//                 i2c.cr2.modify(|_, w| w.stop().stop());
+//             }
+//         });
+//     }
+// }
 
-impl ThreePhaseMotorDriver for BldcPwm {
-    fn enable(&self) {}
-    fn disable(&self) {}
-    /// 0~1
-    fn set_pwm(&self, value: ThreePhaseVoltage<f32>) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let tim = &perip.TIM1;
-                tim.ccr1
-                    .modify(|_, w| unsafe { w.ccr().bits((value.v_u * 800.) as u32) }); // x/800
-                tim.ccr2
-                    .modify(|_, w| unsafe { w.ccr().bits((value.v_v * 800.) as u32) }); // x/800
-                tim.ccr3
-                    .modify(|_, w| unsafe { w.ccr().bits((value.v_w * 800.) as u32) });
-                // x/800
-            }
-        });
-    }
-    fn modify_pwm_output(&self, value: ThreePhaseValue<OutputStatus>) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let tim = &perip.TIM1;
-                match value.u {
-                    OutputStatus::Enable => {
-                        // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc1e().set_bit());
-                        tim.ccer.modify(|_, w| w.cc1ne().set_bit());
-                    }
-                    OutputStatus::Disable => {
-                        // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc1e().clear_bit());
-                        tim.ccer.modify(|_, w| w.cc1ne().clear_bit());
-                    }
-                }
-                match value.v {
-                    OutputStatus::Enable => {
-                        // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc2e().set_bit());
-                        tim.ccer.modify(|_, w| w.cc2ne().set_bit());
-                    }
-                    OutputStatus::Disable => {
-                        // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc2e().clear_bit());
-                        tim.ccer.modify(|_, w| w.cc2ne().clear_bit());
-                    }
-                }
-                match value.w {
-                    OutputStatus::Enable => {
-                        // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc3e().set_bit());
-                        tim.ccer.modify(|_, w| w.cc3ne().set_bit());
-                    }
-                    OutputStatus::Disable => {
-                        // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc3e().clear_bit());
-                        tim.ccer.modify(|_, w| w.cc3ne().clear_bit());
-                    }
-                }
-            }
-        });
-    }
-}
+// impl ThreePhaseMotorDriver for BldcPwm {
+//     fn enable(&self) {}
+//     fn disable(&self) {}
+//     /// 0~1
+//     fn set_pwm(&self, value: ThreePhaseVoltage<f32>) {
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 let tim = &perip.TIM1;
+//                 tim.ccr1
+//                     .modify(|_, w| unsafe { w.ccr().bits((value.v_u * 800.) as u32) }); // x/800
+//                 tim.ccr2
+//                     .modify(|_, w| unsafe { w.ccr().bits((value.v_v * 800.) as u32) }); // x/800
+//                 tim.ccr3
+//                     .modify(|_, w| unsafe { w.ccr().bits((value.v_w * 800.) as u32) });
+//                 // x/800
+//             }
+//         });
+//     }
+//     fn modify_pwm_output(&self, value: ThreePhaseValue<OutputStatus>) {
+//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+//             None => (),
+//             Some(perip) => {
+//                 let tim = &perip.TIM1;
+//                 match value.u {
+//                     OutputStatus::Enable => {
+//                         // CCxE enable output
+//                         tim.ccer.modify(|_, w| w.cc1e().set_bit());
+//                         tim.ccer.modify(|_, w| w.cc1ne().set_bit());
+//                     }
+//                     OutputStatus::Disable => {
+//                         // CCxE enable output
+//                         tim.ccer.modify(|_, w| w.cc1e().clear_bit());
+//                         tim.ccer.modify(|_, w| w.cc1ne().clear_bit());
+//                     }
+//                 }
+//                 match value.v {
+//                     OutputStatus::Enable => {
+//                         // CCxE enable output
+//                         tim.ccer.modify(|_, w| w.cc2e().set_bit());
+//                         tim.ccer.modify(|_, w| w.cc2ne().set_bit());
+//                     }
+//                     OutputStatus::Disable => {
+//                         // CCxE enable output
+//                         tim.ccer.modify(|_, w| w.cc2e().clear_bit());
+//                         tim.ccer.modify(|_, w| w.cc2ne().clear_bit());
+//                     }
+//                 }
+//                 match value.w {
+//                     OutputStatus::Enable => {
+//                         // CCxE enable output
+//                         tim.ccer.modify(|_, w| w.cc3e().set_bit());
+//                         tim.ccer.modify(|_, w| w.cc3ne().set_bit());
+//                     }
+//                     OutputStatus::Disable => {
+//                         // CCxE enable output
+//                         tim.ccer.modify(|_, w| w.cc3e().clear_bit());
+//                         tim.ccer.modify(|_, w| w.cc3ne().clear_bit());
+//                     }
+//                 }
+//             }
+//         });
+//     }
+// }
 
 pub struct Led0 {}
 impl<'a> Indicator for Led0 {
@@ -815,8 +819,8 @@ impl<'a> Indicator for Led0 {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                let gpio = &perip.GPIOA;
-                gpio.bsrr.write(|w| w.bs12().set());
+                let gpio = &perip.GPIOB;
+                gpio.bsrr.write(|w| w.bs0().set());
             }
         });
     }
@@ -824,8 +828,8 @@ impl<'a> Indicator for Led0 {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                let gpio = &perip.GPIOA;
-                gpio.bsrr.write(|w| w.br12().reset());
+                let gpio = &perip.GPIOB;
+                gpio.bsrr.write(|w| w.br0().reset());
             }
         });
     }
@@ -833,11 +837,11 @@ impl<'a> Indicator for Led0 {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                let gpio = &perip.GPIOA;
-                if gpio.odr.read().odr12().is_low() {
-                    gpio.bsrr.write(|w| w.bs12().set());
+                let gpio = &perip.GPIOB;
+                if gpio.odr.read().odr0().is_low() {
+                    gpio.bsrr.write(|w| w.bs0().set());
                 } else {
-                    gpio.bsrr.write(|w| w.br12().reset());
+                    gpio.bsrr.write(|w| w.br0().reset());
                 }
             }
         });
@@ -852,13 +856,13 @@ impl Led0 {
             match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
                 None => (),
                 Some(perip) => {
-                    let gpio = &perip.GPIOA;
+                    let gpio = &perip.GPIOB;
                     // GPIOポートの電源投入(クロックの有効化)
-                    perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
+                    perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
 
                     // gpioモード変更
-                    let gpio = &perip.GPIOA;
-                    gpio.moder.modify(|_, w| w.moder12().output());
+                    let gpio = &perip.GPIOB;
+                    gpio.moder.modify(|_, w| w.moder0().output());
                 }
             }
         });
@@ -871,8 +875,8 @@ impl<'a> Indicator for Led1 {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                let gpio = &perip.GPIOA;
-                gpio.bsrr.write(|w| w.bs11().set());
+                let gpio = &perip.GPIOB;
+                gpio.bsrr.write(|w| w.bs1().set());
             }
         });
     }
@@ -880,8 +884,8 @@ impl<'a> Indicator for Led1 {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                let gpio = &perip.GPIOA;
-                gpio.bsrr.write(|w| w.br11().reset());
+                let gpio = &perip.GPIOB;
+                gpio.bsrr.write(|w| w.br1().reset());
             }
         });
     }
@@ -889,11 +893,11 @@ impl<'a> Indicator for Led1 {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                let gpio = &perip.GPIOA;
-                if gpio.odr.read().odr11().is_low() {
-                    gpio.bsrr.write(|w| w.bs11().set());
+                let gpio = &perip.GPIOB;
+                if gpio.odr.read().odr1().is_low() {
+                    gpio.bsrr.write(|w| w.bs1().set());
                 } else {
-                    gpio.bsrr.write(|w| w.br11().reset());
+                    gpio.bsrr.write(|w| w.br1().reset());
                 }
             }
         });
@@ -908,69 +912,13 @@ impl Led1 {
             match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
                 None => (),
                 Some(perip) => {
-                    let gpio = &perip.GPIOA;
+                    let gpio = &perip.GPIOB;
                     // GPIOポートの電源投入(クロックの有効化)
-                    perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
+                    perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
 
                     // gpioモード変更
-                    let gpio = &perip.GPIOA;
-                    gpio.moder.modify(|_, w| w.moder11().output());
-                }
-            }
-        });
-    }
-}
-
-pub struct Led2 {}
-impl<'a> Indicator for Led2 {
-    fn on(&self) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let gpio = &perip.GPIOA;
-                gpio.bsrr.write(|w| w.bs10().set());
-            }
-        });
-    }
-    fn off(&self) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let gpio = &perip.GPIOA;
-                gpio.bsrr.write(|w| w.br10().reset());
-            }
-        });
-    }
-    fn toggle(&self) {
-        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => (),
-            Some(perip) => {
-                let gpio = &perip.GPIOA;
-                if gpio.odr.read().odr10().is_low() {
-                    gpio.bsrr.write(|w| w.bs10().set());
-                } else {
-                    gpio.bsrr.write(|w| w.br10().reset());
-                }
-            }
-        });
-    }
-}
-impl Led2 {
-    pub fn new() -> Self {
-        Self {}
-    }
-    pub fn init(&self) {
-        free(|cs| {
-            match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-                None => (),
-                Some(perip) => {
-                    let gpio = &perip.GPIOA;
-                    // GPIOポートの電源投入(クロックの有効化)
-                    perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
-
-                    // gpioモード変更
-                    let gpio = &perip.GPIOA;
-                    gpio.moder.modify(|_, w| w.moder10().output());
+                    let gpio = &perip.GPIOB;
+                    gpio.moder.modify(|_, w| w.moder1().output());
                 }
             }
         });
