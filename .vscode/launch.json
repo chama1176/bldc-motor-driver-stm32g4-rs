@@ -7,6 +7,29 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "preLaunchTask": "${defaultBuildTask}",
+            "type": "probe-rs-debug",
+            "request": "launch",
+            "name": "probe_rs Executable Test",
+            "flashingConfig": {
+                "flashingEnabled": true,
+            },
+            //!MODIFY
+            "chip": "STM32G431RBTx",
+            "coreConfigs": [
+                {
+                //!MODIFY
+                "programBinary": "${workspaceRoot}\\target\\thumbv7em-none-eabihf\\release\\bldc-motor-driver-stm32g4",
+                "coreIndex": 0,
+                "rttEnabled": true
+                }
+            ],
+            "env": {
+                //!MODIFY: Remove or use any of the supported DEFMT_LOG options.
+                "DEFMT_LOG": "info"
+            }
+        },
+        {
             "type": "cortex-debug",
             "request": "launch",
             "name": "Debug (QEMU)",

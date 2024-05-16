@@ -6,6 +6,7 @@ use core::cell::RefCell;
 use core::fmt::Write;
 use core::ops::DerefMut;
 use panic_halt as _;
+use defmt_rtt as _;
 
 use cortex_m::interrupt::{free, Mutex};
 use cortex_m_rt::entry;
@@ -142,6 +143,7 @@ fn main() -> ! {
                 // hprintln!("t: {}", t).unwrap();
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
+                defmt::info!("hello from defmt");
                 write!(
                     uart,
                     "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",

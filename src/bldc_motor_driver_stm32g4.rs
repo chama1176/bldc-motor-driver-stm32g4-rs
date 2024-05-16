@@ -301,7 +301,7 @@ impl<'a> FrashStorage {
                 // EOPはEOPIEがセットされているときのみ更新される
                 self.unlock_flash(&flash);
                 flash.cr.write(|w| w.pg().set_bit().eopie().set_bit());
-                hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
+                // hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
                 // write double word 2 x 32bit
                 // write first word. -> write second word
                 let address = 0x0800_7800usize;
@@ -322,53 +322,53 @@ impl<'a> FrashStorage {
                 // Clear the PG bit in the FLASH_CR register if there no more programming request anymore.
                 self.unlock_flash(&flash);
                 flash.cr.write(|w| w.pg().clear_bit());
-                hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
+                // hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
             }
         });
     }
     fn check_and_clear_all_error(&self, flash: &FLASH) {
         if flash.sr.read().optverr().bit_is_set() {
-            hprintln!("optverr error occured: {}", flash.sr.read().optverr().bits()).unwrap();
+            // hprintln!("optverr error occured: {}", flash.sr.read().optverr().bits()).unwrap();
             flash.sr.write(|w| w.optverr().set_bit())
         }
         if flash.sr.read().rderr().bit_is_set() {
-            hprintln!("rderr error occured: {}", flash.sr.read().rderr().bits()).unwrap();
+            // hprintln!("rderr error occured: {}", flash.sr.read().rderr().bits()).unwrap();
             flash.sr.write(|w| w.rderr().set_bit())
         }
         if flash.sr.read().fasterr().bit_is_set() {
-            hprintln!("fasterr error occured: {}", flash.sr.read().fasterr().bits()).unwrap();
+            // hprintln!("fasterr error occured: {}", flash.sr.read().fasterr().bits()).unwrap();
             flash.sr.write(|w| w.fasterr().set_bit())
         }
         if flash.sr.read().miserr().bit_is_set() {
-            hprintln!("miserr error occured: {}", flash.sr.read().miserr().bits()).unwrap();
+            // hprintln!("miserr error occured: {}", flash.sr.read().miserr().bits()).unwrap();
             flash.sr.write(|w| w.miserr().set_bit())
         }
         if flash.sr.read().pgserr().bit_is_set() {
-            hprintln!("pgserr error occured: {}", flash.sr.read().pgserr().bits()).unwrap();
+            // hprintln!("pgserr error occured: {}", flash.sr.read().pgserr().bits()).unwrap();
             flash.sr.write(|w| w.pgserr().set_bit())
         }
         if flash.sr.read().sizerr().bit_is_set() {
-            hprintln!("sizerr error occured: {}", flash.sr.read().sizerr().bits()).unwrap();
+            // hprintln!("sizerr error occured: {}", flash.sr.read().sizerr().bits()).unwrap();
             flash.sr.write(|w| w.sizerr().set_bit())
         }
         if flash.sr.read().pgaerr().bit_is_set() {
-            hprintln!("pgaerr error occured: {}", flash.sr.read().pgaerr().bits()).unwrap();
+            // hprintln!("pgaerr error occured: {}", flash.sr.read().pgaerr().bits()).unwrap();
             flash.sr.write(|w| w.pgaerr().set_bit())
         }
         if flash.sr.read().wrperr().bit_is_set() {
-            hprintln!("wrperr error occured: {}", flash.sr.read().wrperr().bits()).unwrap();
+            // hprintln!("wrperr error occured: {}", flash.sr.read().wrperr().bits()).unwrap();
             flash.sr.write(|w| w.wrperr().set_bit())
         }
         if flash.sr.read().progerr().bit_is_set() {
-            hprintln!("progerr error occured: {}", flash.sr.read().progerr().bits()).unwrap();
+            // hprintln!("progerr error occured: {}", flash.sr.read().progerr().bits()).unwrap();
             flash.sr.write(|w| w.progerr().set_bit())
         }
         if flash.sr.read().operr().bit_is_set() {
-            hprintln!("operr error occured: {}", flash.sr.read().operr().bits()).unwrap();
+            // hprintln!("operr error occured: {}", flash.sr.read().operr().bits()).unwrap();
             flash.sr.write(|w| w.operr().set_bit())
         }
         if flash.sr.read().eop().bit_is_set() {
-            hprintln!("eop error occured: {}", flash.sr.read().eop().bits()).unwrap();
+            // hprintln!("eop error occured: {}", flash.sr.read().eop().bits()).unwrap();
             flash.sr.write(|w| w.eop().set_bit())
         }
     }
