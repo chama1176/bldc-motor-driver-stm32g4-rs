@@ -73,7 +73,7 @@ fn TIM3() {
 fn main() -> ! {
     use stm32g4::stm32g431;
 
-    // hprintln!("Hello, STM32G4!").unwrap();
+    defmt::info!("Hello, from STM32G4!");
     // stm32f401モジュールより、ペリフェラルの入り口となるオブジェクトを取得する。
     let perip = stm32g431::Peripherals::take().unwrap();
     let mut core_perip = stm32g431::CorePeripherals::take().unwrap();
@@ -97,10 +97,8 @@ fn main() -> ! {
     // spi.reset_error();
     let led0 = bldc_motor_driver_stm32g4::Led0::new();
     led0.init();
-    // led0.on();
     let led1 = bldc_motor_driver_stm32g4::Led1::new();
     led1.init();
-    // led1.on();
     // let flash = bldc_motor_driver_stm32g4::FrashStorage::new();
     // flash.write();
 
@@ -140,7 +138,6 @@ fn main() -> ! {
             // 0.1ms
             cnt += 1;
             if cnt > 5000 {
-                // hprintln!("t: {}", t).unwrap();
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 defmt::info!("hello from defmt");
@@ -183,9 +180,8 @@ fn main() -> ! {
                     }
                 });
                 let deg = rad.rad2deg();
-                // hprintln!("deg: {:}, rad: {:}", deg, rad).unwrap();
+                defmt::info!("deg: {}, rad: {}", deg, rad);
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();
-
                 // write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
             }
             prev = t;

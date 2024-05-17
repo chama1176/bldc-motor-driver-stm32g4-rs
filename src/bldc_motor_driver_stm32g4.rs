@@ -5,7 +5,6 @@ use cortex_m::interrupt::{free, Mutex};
 use cortex_m::register;
 
 #[allow(unused_imports)]
-use cortex_m_semihosting::hprintln;
 use stm32g4::stm32g431::CorePeripherals;
 use stm32g4::stm32g431::Interrupt;
 use stm32g4::stm32g431::Peripherals;
@@ -54,16 +53,16 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
         .acr
         .modify(|_, w| unsafe { w.latency().bits(4) });
     while perip.FLASH.acr.read().latency().bits() != 4 {
-        // hprintln!("latency bit: {}", perip.FLASH.acr.read().latency().bits()).unwrap();
+        defmt::info!("latency bit: {}", perip.FLASH.acr.read().latency().bits());
     }
 
     perip.RCC.cfgr.modify(|_, w| w.sw().pll());
     // perip.RCC.cfgr.modify(|_, w| w.sw().hse());
-    // hprintln!("sw bit: {}", perip.RCC.cfgr.read().sw().bits()).unwrap();
+    defmt::info!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
     while !perip.RCC.cfgr.read().sw().is_pll() {}
     while !perip.RCC.cfgr.read().sws().is_pll() {
-        // hprintln!("sw bit: {}", perip.RCC.cfgr.read().sw().bits()).unwrap();
-        // hprintln!("sws bit: {}", perip.RCC.cfgr.read().sws().bits()).unwrap();
+        defmt::info!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
+        defmt::info!("sws bit: {}", perip.RCC.cfgr.read().sws().bits());
     }
     // while !perip.RCC.cfgr.read().sws().is_hse() {}
 
@@ -260,6 +259,7 @@ pub fn dma_adc2_start(perip: &Peripherals) {
 }
 
 
+// TODO: Need to check
 pub struct FrashStorage {}
 impl<'a> FrashStorage {
     pub fn new() -> Self {
@@ -270,9 +270,9 @@ impl<'a> FrashStorage {
             None => (),
             Some(perip) => {
                 let flash = &perip.FLASH;
-                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                defmt::info!("flash cr lock: {}", flash.cr.read().lock().bit_is_set());
                 self.unlock_flash(&flash);
-                // hprintln!("flash cr lock: {}", flash.cr.read().lock().bit_is_set()).unwrap();
+                defmt::info!("flash cr lock: {}", flash.cr.read().lock().bit_is_set());
 
                 // Page erase
                 // Check BSY in FLASH_SR is not set.
@@ -285,12 +285,13 @@ impl<'a> FrashStorage {
                 // Set the STRT bit in the FLASH_CR register.
                 // 一行で書かないとロックされてしまう
                 flash.cr.write(|w| unsafe {w.pnb().bits(15).per().set_bit().strt().set_bit()});
-                // hprintln!("per bit: {}", flash.cr.read().per().bits()).unwrap();
-                // hprintln!("pnb bit: {}", flash.cr.read().pnb().bits()).unwrap();
-                // hprintln!("strt bit: {}", flash.cr.read().strt().bits()).unwrap();
+                defmt::info!("per bit: {}", flash.cr.read().per().bits());
+                defmt::info!("pnb bit: {}", flash.cr.read().pnb().bits());
+                defmt::info!("strt bit: {}", flash.cr.read().strt().bits());
+
                 //  Wait for the BSY bit to be cleared in the FLASH_SR register.
                 while flash.sr.read().bsy().bit_is_set() {}
-                // hprintln!("bsy bit: {}", flash.sr.read().bsy().bits()).unwrap();
+                defmt::info!("bsy bit: {}", flash.sr.read().bsy().bits());
 
                 // FLASH programming
                 // Check BSY in FLASH_SR is not set.
@@ -301,7 +302,8 @@ impl<'a> FrashStorage {
                 // EOPはEOPIEがセットされているときのみ更新される
                 self.unlock_flash(&flash);
                 flash.cr.write(|w| w.pg().set_bit().eopie().set_bit());
-                // hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
+                defmt::info!("pg bit: {}", flash.cr.read().pg().bits());
+
                 // write double word 2 x 32bit
                 // write first word. -> write second word
                 let address = 0x0800_7800usize;
@@ -322,53 +324,54 @@ impl<'a> FrashStorage {
                 // Clear the PG bit in the FLASH_CR register if there no more programming request anymore.
                 self.unlock_flash(&flash);
                 flash.cr.write(|w| w.pg().clear_bit());
-                // hprintln!("pg bit: {}", flash.cr.read().pg().bits()).unwrap();
+                defmt::info!("pg bit: {}", flash.cr.read().pg().bits());
+
             }
         });
     }
     fn check_and_clear_all_error(&self, flash: &FLASH) {
         if flash.sr.read().optverr().bit_is_set() {
-            // hprintln!("optverr error occured: {}", flash.sr.read().optverr().bits()).unwrap();
+            defmt::error!("optverr error occured: {}", flash.sr.read().optverr().bits());
             flash.sr.write(|w| w.optverr().set_bit())
         }
         if flash.sr.read().rderr().bit_is_set() {
-            // hprintln!("rderr error occured: {}", flash.sr.read().rderr().bits()).unwrap();
+            defmt::error!("rderr error occured: {}", flash.sr.read().rderr().bits());
             flash.sr.write(|w| w.rderr().set_bit())
         }
         if flash.sr.read().fasterr().bit_is_set() {
-            // hprintln!("fasterr error occured: {}", flash.sr.read().fasterr().bits()).unwrap();
+            defmt::error!("fasterr error occured: {}", flash.sr.read().fasterr().bits());
             flash.sr.write(|w| w.fasterr().set_bit())
         }
         if flash.sr.read().miserr().bit_is_set() {
-            // hprintln!("miserr error occured: {}", flash.sr.read().miserr().bits()).unwrap();
+            defmt::error!("miserr error occured: {}", flash.sr.read().miserr().bits());
             flash.sr.write(|w| w.miserr().set_bit())
         }
         if flash.sr.read().pgserr().bit_is_set() {
-            // hprintln!("pgserr error occured: {}", flash.sr.read().pgserr().bits()).unwrap();
+            defmt::error!("pgserr error occured: {}", flash.sr.read().pgserr().bits());
             flash.sr.write(|w| w.pgserr().set_bit())
         }
         if flash.sr.read().sizerr().bit_is_set() {
-            // hprintln!("sizerr error occured: {}", flash.sr.read().sizerr().bits()).unwrap();
+            defmt::error!("sizerr error occured: {}", flash.sr.read().sizerr().bits());
             flash.sr.write(|w| w.sizerr().set_bit())
         }
         if flash.sr.read().pgaerr().bit_is_set() {
-            // hprintln!("pgaerr error occured: {}", flash.sr.read().pgaerr().bits()).unwrap();
+            defmt::error!("pgaerr error occured: {}", flash.sr.read().pgaerr().bits());
             flash.sr.write(|w| w.pgaerr().set_bit())
         }
         if flash.sr.read().wrperr().bit_is_set() {
-            // hprintln!("wrperr error occured: {}", flash.sr.read().wrperr().bits()).unwrap();
+            defmt::error!("wrperr error occured: {}", flash.sr.read().wrperr().bits());
             flash.sr.write(|w| w.wrperr().set_bit())
         }
         if flash.sr.read().progerr().bit_is_set() {
-            // hprintln!("progerr error occured: {}", flash.sr.read().progerr().bits()).unwrap();
+            defmt::error!("progerr error occured: {}", flash.sr.read().progerr().bits());
             flash.sr.write(|w| w.progerr().set_bit())
         }
         if flash.sr.read().operr().bit_is_set() {
-            // hprintln!("operr error occured: {}", flash.sr.read().operr().bits()).unwrap();
+            defmt::error!("operr error occured: {}", flash.sr.read().operr().bits());
             flash.sr.write(|w| w.operr().set_bit())
         }
         if flash.sr.read().eop().bit_is_set() {
-            // hprintln!("eop error occured: {}", flash.sr.read().eop().bits()).unwrap();
+            defmt::error!("eop error occured: {}", flash.sr.read().eop().bits());
             flash.sr.write(|w| w.eop().set_bit())
         }
     }
@@ -534,7 +537,7 @@ impl<'a> Uart1 {
 //                 gpiob.bsrr.write(|w| w.bs6().set());
 
 //                 let data = spi.dr.read().dr().bits();
-//                 // hprintln!("dr: {:x}", data).unwrap();
+// defmt::info!("dr: {:x}", data);
 //                 Some(data & 0x3FFF)
 //             }
 //         })
@@ -726,21 +729,23 @@ impl<'a> Uart1 {
 //                 while i2c.cr2.read().start().bit_is_set() {}
 //                 i2c.cr2.modify(|_, w| w.start().set_bit());
 //                 while i2c.isr.read().txis().bit_is_clear() {
-//                     // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-//                     // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-//                     // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+    // defmt::info!("berr: {}", i2c.isr.read().berr().bit_is_set());
+    // defmt::info!("arlo: {}", i2c.isr.read().arlo().bit_is_set());
+    // defmt::info!("nackf: {}", i2c.isr.read().nackf().bit_is_set());
 //                 }
 //                 i2c.txdr.modify(|_, w| w.txdata().bits(data[0]));
 //                 while i2c.isr.read().txis().bit_is_clear() {
-//                     // hprintln!("berr: {}", i2c.isr.read().berr().bit_is_set()).unwrap();
-//                     // hprintln!("arlo: {}", i2c.isr.read().arlo().bit_is_set()).unwrap();
-//                     // hprintln!("nackf: {}", i2c.isr.read().nackf().bit_is_set()).unwrap();
+    // defmt::info!("berr: {}", i2c.isr.read().berr().bit_is_set());
+    // defmt::info!("arlo: {}", i2c.isr.read().arlo().bit_is_set());
+    // defmt::info!("nackf: {}", i2c.isr.read().nackf().bit_is_set());
+
 //                 }
 //                 i2c.txdr.modify(|_, w| w.txdata().bits(data[1]));
 
 //                 while i2c.isr.read().tc().bit_is_clear() {
-//                     // hprintln!("is_busy: {}", i2c.isr.read().busy().is_busy()).unwrap();
-//                     // hprintln!("nbytes: {}", i2c.cr2.read().nbytes().bits()).unwrap();
+    // defmt::info!("is_busy: {}", i2c.isr.read().busy().is_busy());
+    // defmt::info!("nbytes: {}", i2c.cr2.read().nbytes().bits());
+
 //                 }
 //                 i2c.cr2.modify(|_, w| w.stop().stop());
 //             }
