@@ -5,8 +5,8 @@
 use core::cell::RefCell;
 use core::fmt::Write;
 use core::ops::DerefMut;
-use panic_halt as _;
 use defmt_rtt as _;
+use panic_halt as _;
 
 use cortex_m::interrupt::{free, Mutex};
 use cortex_m_rt::entry;
@@ -92,8 +92,8 @@ fn main() -> ! {
     // let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
     // pwm.init();
 
-    // let spi = bldc_motor_driver_stm32g4::Spi3::new();
-    // spi.init();
+    let spi = bldc_motor_driver_stm32g4::Spi3::new();
+    spi.init();
     // spi.reset_error();
     let led0 = bldc_motor_driver_stm32g4::Led0::new();
     led0.init();
@@ -141,6 +141,8 @@ fn main() -> ! {
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 defmt::info!("hello from defmt");
+                spi.txrx(0x916000);
+                spi.txrx(0x110000);
                 write!(
                     uart,
                     "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",

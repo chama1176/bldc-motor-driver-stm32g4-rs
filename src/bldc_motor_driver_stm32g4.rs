@@ -20,7 +20,6 @@ use motml::motor_driver::ThreePhaseValue;
 use motml::motor_driver::ThreePhaseVoltage;
 use motml::utils::Deg;
 
-
 pub static G_PERIPHERAL: Mutex<RefCell<Option<stm32g4::stm32g431::Peripherals>>> =
     Mutex::new(RefCell::new(None));
 
@@ -258,7 +257,6 @@ pub fn dma_adc2_start(perip: &Peripherals) {
     adc.cr.modify(|_, w| w.adstart().start()); // ADC start
 }
 
-
 // TODO: Need to check
 pub struct FrashStorage {}
 impl<'a> FrashStorage {
@@ -284,7 +282,9 @@ impl<'a> FrashStorage {
                 // The associated bank (BKER) in the Flash control register (FLASH_CR) must be kept cleared.
                 // Set the STRT bit in the FLASH_CR register.
                 // 一行で書かないとロックされてしまう
-                flash.cr.write(|w| unsafe {w.pnb().bits(15).per().set_bit().strt().set_bit()});
+                flash
+                    .cr
+                    .write(|w| unsafe { w.pnb().bits(15).per().set_bit().strt().set_bit() });
                 defmt::info!("per bit: {}", flash.cr.read().per().bits());
                 defmt::info!("pnb bit: {}", flash.cr.read().pnb().bits());
                 defmt::info!("strt bit: {}", flash.cr.read().strt().bits());
@@ -308,7 +308,7 @@ impl<'a> FrashStorage {
                 // write first word. -> write second word
                 let address = 0x0800_7800usize;
                 let r1 = address as *mut u32;
-                let r2 = (address+0x4) as *mut u32;
+                let r2 = (address + 0x4) as *mut u32;
                 unsafe {
                     *r1 = 0xCB;
                     *r2 = 0xDA;
@@ -319,19 +319,20 @@ impl<'a> FrashStorage {
                 while flash.sr.read().eop().bit_is_clear() {}
                 // Writing 1 to clear.
                 flash.sr.write(|w| w.eop().set_bit());
-                
 
                 // Clear the PG bit in the FLASH_CR register if there no more programming request anymore.
                 self.unlock_flash(&flash);
                 flash.cr.write(|w| w.pg().clear_bit());
                 defmt::info!("pg bit: {}", flash.cr.read().pg().bits());
-
             }
         });
     }
     fn check_and_clear_all_error(&self, flash: &FLASH) {
         if flash.sr.read().optverr().bit_is_set() {
-            defmt::error!("optverr error occured: {}", flash.sr.read().optverr().bits());
+            defmt::error!(
+                "optverr error occured: {}",
+                flash.sr.read().optverr().bits()
+            );
             flash.sr.write(|w| w.optverr().set_bit())
         }
         if flash.sr.read().rderr().bit_is_set() {
@@ -339,7 +340,10 @@ impl<'a> FrashStorage {
             flash.sr.write(|w| w.rderr().set_bit())
         }
         if flash.sr.read().fasterr().bit_is_set() {
-            defmt::error!("fasterr error occured: {}", flash.sr.read().fasterr().bits());
+            defmt::error!(
+                "fasterr error occured: {}",
+                flash.sr.read().fasterr().bits()
+            );
             flash.sr.write(|w| w.fasterr().set_bit())
         }
         if flash.sr.read().miserr().bit_is_set() {
@@ -363,7 +367,10 @@ impl<'a> FrashStorage {
             flash.sr.write(|w| w.wrperr().set_bit())
         }
         if flash.sr.read().progerr().bit_is_set() {
-            defmt::error!("progerr error occured: {}", flash.sr.read().progerr().bits());
+            defmt::error!(
+                "progerr error occured: {}",
+                flash.sr.read().progerr().bits()
+            );
             flash.sr.write(|w| w.progerr().set_bit())
         }
         if flash.sr.read().operr().bit_is_set() {
@@ -453,8 +460,108 @@ impl<'a> Uart1 {
     }
 }
 
-// pub struct Spi3 {}
-// impl Spi3 {
+pub struct Spi3 {}
+impl Spi3 {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                // GPIOポートの電源投入(クロックの有効化)
+                perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
+                perip.RCC.ahb2enr.modify(|_, w| w.gpioaen().set_bit());
+                perip.RCC.apb1enr1.modify(|_, w| w.spi3en().enabled());
+
+                // gpioモード変更
+                let gpioa: &stm32g4::stm32g431::GPIOA = &perip.GPIOA;
+                let gpioc: &stm32g4::stm32g431::GPIOC = &perip.GPIOC;
+                gpioa.moder.modify(|_, w| w.moder15().output()); // CS pin
+                gpioc.moder.modify(|_, w| w.moder12().alternate());
+                gpioc.moder.modify(|_, w| w.moder11().alternate());
+                gpioc.moder.modify(|_, w| w.moder10().alternate());
+                gpioc.afrh.modify(|_, w| w.afrh12().af6());
+                gpioc.afrh.modify(|_, w| w.afrh11().af6());
+                gpioc.afrh.modify(|_, w| w.afrh10().af6());
+                gpioa.ospeedr.modify(|_, w| w.ospeedr15().very_high_speed()); // CS pin
+                gpioc.ospeedr.modify(|_, w| w.ospeedr12().very_high_speed());
+                gpioc.ospeedr.modify(|_, w| w.ospeedr11().very_high_speed());
+                gpioc.ospeedr.modify(|_, w| w.ospeedr10().very_high_speed());
+                gpioa.otyper.modify(|_, w| w.ot15().push_pull()); // CS pin
+
+                let spi = &perip.SPI3;
+                spi.cr1.modify(|_, w| w.spe().clear_bit());
+
+                // Set Baudrate
+                spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
+
+                // Set Clock polarity
+                spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low
+
+                // Set Clock phase
+                spi.cr1.modify(|_, w| w.cpha().set_bit()); // second edge(down edge in-case idle is low)
+
+                // Bidirectional data mode enable(half-duplex communication)
+                spi.cr1.modify(|_, w| w.bidimode().clear_bit());
+                // Set MSB LSB first
+                spi.cr1.modify(|_, w| w.lsbfirst().clear_bit());
+                // Set NSS management
+                // Soft ware slave management
+                spi.cr1.modify(|_, w| w.ssm().set_bit());
+                // Internal slave select
+                spi.cr1.modify(|_, w| w.ssi().set_bit());
+                // Master configuration
+                spi.cr1.modify(|_, w| w.mstr().set_bit());
+
+                // Data size
+                // 24bit, so 12bit x2
+                spi.cr2.modify(|_, w| unsafe { w.ds().bits(0b1011) }); // 12bit
+
+                // SS output
+                spi.cr2.modify(|_, w| w.ssoe().clear_bit());
+                // Frame format
+                spi.cr2.modify(|_, w| w.frf().clear_bit()); // Motorola mode
+
+                // NSS pulse management
+                spi.cr2.modify(|_, w| w.nssp().set_bit());
+                //
+                spi.cr1.modify(|_, w| w.spe().set_bit());
+            }
+        });
+    }
+    pub fn txrx(&self, msg: u32) -> Option<u32> {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => None,
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.br15().reset());
+                let spi = &perip.SPI3;
+
+                let c = [((msg & 0xFFF000) >> 12) as u16, (msg & 0xFFF) as u16];
+                let mut data: u32 = 0;
+                for i in 0..2 {
+                    while spi.sr.read().txe().bit_is_clear() {}
+                    // send 8bit data automatically 2 times
+                    spi.dr.modify(|_, w| unsafe { w.dr().bits(c[i].into()) });
+                    defmt::info!("c: {=u16:X}", c[i]);
+
+                    while spi.sr.read().bsy().bit_is_set() {}
+                    while spi.sr.read().rxne().bit_is_clear() {}
+                    let tmp = spi.dr.read().dr().bits();
+                    data |= (tmp as u32 & 0x0FFF) << ((1-i) * 12);
+                    defmt::info!("tmp: {=u16:X}", tmp);
+                }
+                gpioa.bsrr.write(|w| w.bs15().set());
+                defmt::info!("dr: {=u32:X}", data);
+                Some(data)
+            }
+        })
+    }
+}
+
+// pub struct Spi1 {}
+// impl Spi1 {
 //     pub fn new() -> Self {
 //         Self {}
 //     }
@@ -537,13 +644,14 @@ impl<'a> Uart1 {
 //                 gpiob.bsrr.write(|w| w.bs6().set());
 
 //                 let data = spi.dr.read().dr().bits();
-// defmt::info!("dr: {:x}", data);
+//                 defmt::info!("dr: {:x}", data);
 //                 Some(data & 0x3FFF)
 //             }
 //         })
 //     }
 // }
-// impl Encoder<f32> for Spi3 {
+
+// impl Encoder<f32> for Spi1 {
 //     fn get_angle(&self) -> Option<f32> {
 //         let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
 //         let p: u16 = data.count_ones() as u16 % 2; // parity
@@ -729,22 +837,22 @@ impl<'a> Uart1 {
 //                 while i2c.cr2.read().start().bit_is_set() {}
 //                 i2c.cr2.modify(|_, w| w.start().set_bit());
 //                 while i2c.isr.read().txis().bit_is_clear() {
-    // defmt::info!("berr: {}", i2c.isr.read().berr().bit_is_set());
-    // defmt::info!("arlo: {}", i2c.isr.read().arlo().bit_is_set());
-    // defmt::info!("nackf: {}", i2c.isr.read().nackf().bit_is_set());
+// defmt::info!("berr: {}", i2c.isr.read().berr().bit_is_set());
+// defmt::info!("arlo: {}", i2c.isr.read().arlo().bit_is_set());
+// defmt::info!("nackf: {}", i2c.isr.read().nackf().bit_is_set());
 //                 }
 //                 i2c.txdr.modify(|_, w| w.txdata().bits(data[0]));
 //                 while i2c.isr.read().txis().bit_is_clear() {
-    // defmt::info!("berr: {}", i2c.isr.read().berr().bit_is_set());
-    // defmt::info!("arlo: {}", i2c.isr.read().arlo().bit_is_set());
-    // defmt::info!("nackf: {}", i2c.isr.read().nackf().bit_is_set());
+// defmt::info!("berr: {}", i2c.isr.read().berr().bit_is_set());
+// defmt::info!("arlo: {}", i2c.isr.read().arlo().bit_is_set());
+// defmt::info!("nackf: {}", i2c.isr.read().nackf().bit_is_set());
 
 //                 }
 //                 i2c.txdr.modify(|_, w| w.txdata().bits(data[1]));
 
 //                 while i2c.isr.read().tc().bit_is_clear() {
-    // defmt::info!("is_busy: {}", i2c.isr.read().busy().is_busy());
-    // defmt::info!("nbytes: {}", i2c.cr2.read().nbytes().bits());
+// defmt::info!("is_busy: {}", i2c.isr.read().busy().is_busy());
+// defmt::info!("nbytes: {}", i2c.cr2.read().nbytes().bits());
 
 //                 }
 //                 i2c.cr2.modify(|_, w| w.stop().stop());
