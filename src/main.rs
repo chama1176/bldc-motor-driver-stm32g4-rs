@@ -102,6 +102,8 @@ fn main() -> ! {
     // let flash = bldc_motor_driver_stm32g4::FrashStorage::new();
     // flash.write();
 
+    // Setup motor driver
+
     let app = app::App::new(led0, led1 /*pwm, spi*/);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
 
@@ -155,6 +157,17 @@ fn main() -> ! {
                     adc_data[6]
                 )
                 .unwrap();
+                defmt::info!(
+                    "{{\"ADC\":[{}, {}, {}, {}, {}, {}, {}]}}",
+                    adc_data[0],
+                    adc_data[1],
+                    adc_data[2],
+                    adc_data[3],
+                    adc_data[4],
+                    adc_data[5],
+                    adc_data[6]
+                );
+
                 // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
                 let mut tv = (adc_data[4] as f32 - 2000.0f32) / 1000.0f32;

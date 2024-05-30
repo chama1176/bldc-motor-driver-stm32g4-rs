@@ -30,6 +30,7 @@ pub fn init_g_peripheral(perip: Peripherals) {
 pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
     perip.RCC.cr.modify(|_, w| w.hseon().on());
+
     while perip.RCC.cr.read().hserdy().is_not_ready() {}
 
     // Disable the PLL
@@ -544,16 +545,12 @@ impl Spi3 {
                     while spi.sr.read().txe().bit_is_clear() {}
                     // send 8bit data automatically 2 times
                     spi.dr.modify(|_, w| unsafe { w.dr().bits(c[i].into()) });
-                    defmt::info!("c: {=u16:X}", c[i]);
-
                     while spi.sr.read().bsy().bit_is_set() {}
                     while spi.sr.read().rxne().bit_is_clear() {}
                     let tmp = spi.dr.read().dr().bits();
-                    data |= (tmp as u32 & 0x0FFF) << ((1-i) * 12);
-                    defmt::info!("tmp: {=u16:X}", tmp);
+                    data |= (tmp as u32 & 0x0FFF) << ((1 - i) * 12);
                 }
                 gpioa.bsrr.write(|w| w.bs15().set());
-                defmt::info!("dr: {=u32:X}", data);
                 Some(data)
             }
         })
