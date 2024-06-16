@@ -17,13 +17,12 @@ pub enum State {
     Operating120DegreeDrive,
     OperatingQPhase,
 }
-pub struct App<T0, T1>
+pub struct App<T0, T1, M>
 //, T2, M, E>
 where
     T0: Indicator,
     T1: Indicator,
-    // T2: Indicator,
-    // M: ThreePhaseMotorDriver,
+    M: ThreePhaseMotorDriver,
     // E: Encoder<f32>,
 {
     tv: f32,
@@ -34,21 +33,19 @@ where
     //
     led0: T0,
     led1: T1,
-    // led2: T2,
-    // bldc: M,
+    bldc: M,
     // encoder: E,
     // motor: ThreePhaseMotor,
 }
 
-impl<T0, T1 /*T2, M, E*/> App<T0, T1 /*, T2, M, E*/>
+impl<T0, T1, M/*, E*/> App<T0, T1, M/*, E*/>
 where
     T0: Indicator,
     T1: Indicator,
-    // T2: Indicator,
-    // M: ThreePhaseMotorDriver,
+    M: ThreePhaseMotorDriver,
     // E: Encoder<f32>,
 {
-    pub fn new(led0: T0, led1: T1 /*led2: T2, bldc: M, encoder: E*/) -> Self {
+    pub fn new(led0: T0, led1: T1, bldc: M, /*encoder: E*/) -> Self {
         Self {
             tv: 0.0,
             count: 0,
@@ -57,8 +54,7 @@ where
             encoder_offset: 0.23163112,
             led0,
             led1,
-            // led2,
-            // bldc,
+            bldc,
             // encoder,
             // motor: ThreePhaseMotor::new(12),
         }

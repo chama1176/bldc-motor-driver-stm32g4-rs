@@ -34,8 +34,7 @@ static G_APP: Mutex<
             app::App<
                 bldc_motor_driver_stm32g4::Led0,
                 bldc_motor_driver_stm32g4::Led1,
-                // bldc_motor_driver_stm32g4::Led2,
-                // bldc_motor_driver_stm32g4::BldcPwm,
+                bldc_motor_driver_stm32g4::BldcPwm,
                 // bldc_motor_driver_stm32g4::Spi3,
             >,
         >,
@@ -89,8 +88,8 @@ fn main() -> ! {
 
     let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
     uart.init();
-    // let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
-    // pwm.init();
+    let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
+    pwm.init();
 
     let spi = bldc_motor_driver_stm32g4::Spi3::new();
     spi.init();
@@ -103,8 +102,11 @@ fn main() -> ! {
     // flash.write();
 
     // Setup motor driver
+    // Change Buck Convetor Frequency
+    // spi.txrx(0x917000);
+    // spi.txrx(0x110000);
 
-    let app = app::App::new(led0, led1 /*pwm, spi*/);
+    let app = app::App::new(led0, led1, pwm/*, spi*/);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
 
     let mut t = 0;
@@ -143,8 +145,6 @@ fn main() -> ! {
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 defmt::info!("hello from defmt");
-                spi.txrx(0x916000);
-                spi.txrx(0x110000);
                 write!(
                     uart,
                     "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
