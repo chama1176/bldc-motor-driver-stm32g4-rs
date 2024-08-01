@@ -62,7 +62,7 @@ fn TIM3() {
             None => (),
             Some(app) => {
                 app.set_count(COUNT.clone());
-                // app.periodic_task();
+                app.periodic_task();
             }
         }
     });
@@ -105,6 +105,9 @@ fn main() -> ! {
     // Change Buck Convetor Frequency
     // spi.txrx(0x917000);
     // spi.txrx(0x110000);
+    // Set Dead Time
+    spi.txrx(0x800000 | 0x1B_0000);
+    spi.txrx(0x000000 | 0x1B_0000);
 
     let app = app::App::new(led0, led1, pwm/*, spi*/);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
@@ -170,7 +173,7 @@ fn main() -> ! {
 
                 // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
-                let mut tv = (adc_data[4] as f32 - 2000.0f32) / 1000.0f32;
+                let mut tv = (adc_data[1] as f32 - 2000.0f32) / 1000.0f32;
                 if tv > 1.0 {
                     tv = 1.0;
                 }
@@ -179,14 +182,14 @@ fn main() -> ! {
                 free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
                     None => (),
                     Some(app) => {
-                        app.periodic_task();
+                        app.led_tick_task();
                         app.set_target_velocity(tv);
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();
                         if tv > 0.1 {
-                            // app.set_sate(app::State::OperatingForcedCommutation2);
+                            app.set_sate(app::State::OperatingForcedCommutation2);
                             // app.set_sate(app::State::Operating120DegreeDrive);
-                            app.set_sate(app::State::OperatingQPhase);
+                            // app.set_sate(app::State::OperatingQPhase);
                         } else if tv < -0.5 {
                             app.set_sate(app::State::Calibrating);
                         } else {

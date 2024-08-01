@@ -62,8 +62,6 @@ where
     #[rustfmt::skip]
     pub fn periodic_task(&mut self) {
         self.led0.toggle();
-        self.led1.toggle();
-
         self.calib_count = 7;
         let mut tp = ThreePhaseVoltage::<f32> { v_u: 0., v_v: 0., v_w: 0. };
         let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
@@ -141,7 +139,7 @@ where
                 // }
             }
             State::OperatingForcedCommutation2 =>{
-                let s =((self.count as f32/(1000.0*1.0)) as u32)%6;
+                let s =((self.count as f32/(10.0*1.0)) as u32)%6;
                 match s {
                     0 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.},
                     1 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0.25, v_w: 0.},
@@ -157,14 +155,17 @@ where
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
             State::Calibrating => {
-                tp = ThreePhaseVoltage{ v_u: 0.05, v_v: 0., v_w: 0. };
+                tp = ThreePhaseVoltage{ v_u: 0.3, v_v: 0.3, v_w: 0.3 };
             }
             _ =>{
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
         }
-        // self.bldc.set_pwm(tp);
-        // self.bldc.modify_pwm_output(tpe);
+        self.bldc.set_pwm(tp);
+        self.bldc.modify_pwm_output(tpe);
+    }
+    pub fn led_tick_task(&mut self) {
+        self.led1.toggle();
     }
     pub fn set_target_velocity(&mut self, tv: f32) {
         self.tv = tv;

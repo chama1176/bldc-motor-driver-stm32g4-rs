@@ -782,11 +782,11 @@ impl ThreePhaseMotorDriver for BldcPwm {
             None => (),
             Some(perip) => {
                 let tim = &perip.TIM1;
-                tim.ccr1
+                tim.ccr3
                     .modify(|_, w| unsafe { w.ccr().bits((value.v_u * 800.) as u32) }); // x/800
                 tim.ccr2
                     .modify(|_, w| unsafe { w.ccr().bits((value.v_v * 800.) as u32) }); // x/800
-                tim.ccr3
+                tim.ccr1
                     .modify(|_, w| unsafe { w.ccr().bits((value.v_w * 800.) as u32) });
                 // x/800
             }
@@ -800,13 +800,13 @@ impl ThreePhaseMotorDriver for BldcPwm {
                 match value.u {
                     OutputStatus::Enable => {
                         // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc1e().set_bit());
-                        tim.ccer.modify(|_, w| w.cc1ne().set_bit());
+                        tim.ccer.modify(|_, w| w.cc3e().set_bit());
+                        tim.ccer.modify(|_, w| w.cc3ne().set_bit());
                     }
                     OutputStatus::Disable => {
                         // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc1e().clear_bit());
-                        tim.ccer.modify(|_, w| w.cc1ne().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc3e().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc3ne().clear_bit());
                     }
                 }
                 match value.v {
@@ -824,13 +824,13 @@ impl ThreePhaseMotorDriver for BldcPwm {
                 match value.w {
                     OutputStatus::Enable => {
                         // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc3e().set_bit());
-                        tim.ccer.modify(|_, w| w.cc3ne().set_bit());
+                        tim.ccer.modify(|_, w| w.cc1e().set_bit());
+                        tim.ccer.modify(|_, w| w.cc1ne().set_bit());
                     }
                     OutputStatus::Disable => {
                         // CCxE enable output
-                        tim.ccer.modify(|_, w| w.cc3e().clear_bit());
-                        tim.ccer.modify(|_, w| w.cc3ne().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc1e().clear_bit());
+                        tim.ccer.modify(|_, w| w.cc1ne().clear_bit());
                     }
                 }
             }
