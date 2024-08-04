@@ -557,117 +557,117 @@ impl Spi3 {
     }
 }
 
-// pub struct Spi1 {}
-// impl Spi1 {
-//     pub fn new() -> Self {
-//         Self {}
-//     }
-//     pub fn init(&self) {
-//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-//             None => (),
-//             Some(perip) => {
-//                 // GPIOポートの電源投入(クロックの有効化)
-//                 perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
-//                 perip.RCC.apb1enr1.modify(|_, w| w.spi3en().enabled());
+pub struct Spi1 {}
+impl Spi1 {
+    pub fn new() -> Self {
+        Self {}
+    }
+    pub fn init(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                // GPIOポートの電源投入(クロックの有効化)
+                perip.RCC.ahb2enr.modify(|_, w| w.gpioben().set_bit());
+                perip.RCC.apb2enr.modify(|_, w| w.spi1en().enabled());
 
-//                 // gpioモード変更
-//                 let gpiob = &perip.GPIOB;
-//                 gpiob.moder.modify(|_, w| w.moder6().output()); // CS pin
-//                 gpiob.moder.modify(|_, w| w.moder5().alternate());
-//                 gpiob.moder.modify(|_, w| w.moder4().alternate());
-//                 gpiob.moder.modify(|_, w| w.moder3().alternate());
-//                 gpiob.afrl.modify(|_, w| w.afrl5().af6());
-//                 gpiob.afrl.modify(|_, w| w.afrl4().af6());
-//                 gpiob.afrl.modify(|_, w| w.afrl3().af6());
-//                 gpiob.ospeedr.modify(|_, w| w.ospeedr6().very_high_speed()); // CS pin
-//                 gpiob.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
-//                 gpiob.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
-//                 gpiob.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
-//                 gpiob.otyper.modify(|_, w| w.ot6().push_pull()); // CS pin
+                // gpioモード変更
+                let gpiob = &perip.GPIOB;
+                gpiob.moder.modify(|_, w| w.moder9().output()); // CS pin
+                gpiob.moder.modify(|_, w| w.moder5().alternate());
+                gpiob.moder.modify(|_, w| w.moder4().alternate());
+                gpiob.moder.modify(|_, w| w.moder3().alternate());
+                gpiob.afrl.modify(|_, w| w.afrl5().af5());
+                gpiob.afrl.modify(|_, w| w.afrl4().af5());
+                gpiob.afrl.modify(|_, w| w.afrl3().af5());
+                gpiob.ospeedr.modify(|_, w| w.ospeedr9().very_high_speed()); // CS pin
+                gpiob.ospeedr.modify(|_, w| w.ospeedr5().very_high_speed());
+                gpiob.ospeedr.modify(|_, w| w.ospeedr4().very_high_speed());
+                gpiob.ospeedr.modify(|_, w| w.ospeedr3().very_high_speed());
+                gpiob.otyper.modify(|_, w| w.ot9().push_pull()); // CS pin
 
-//                 let spi = &perip.SPI3;
-//                 spi.cr1.modify(|_, w| w.spe().clear_bit());
+                let spi = &perip.SPI1;
+                spi.cr1.modify(|_, w| w.spe().clear_bit());
 
-//                 // Set Baudrate
-//                 spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
+                // Set Baudrate
+                spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
 
-//                 // Set Clock polarity
-//                 spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low
+                // Set Clock polarity
+                spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low
 
-//                 // Set Clock phase
-//                 spi.cr1.modify(|_, w| w.cpha().set_bit()); // second edge(down edge in-case idle is low)
+                // Set Clock phase
+                spi.cr1.modify(|_, w| w.cpha().set_bit()); // second edge(down edge in-case idle is low)
 
-//                 // Bidirectional data mode enable(half-duplex communication)
-//                 spi.cr1.modify(|_, w| w.bidimode().clear_bit());
-//                 // Set MSL LSB first
-//                 spi.cr1.modify(|_, w| w.lsbfirst().clear_bit());
-//                 // Set NSS management
-//                 // Soft ware slave management
-//                 spi.cr1.modify(|_, w| w.ssm().set_bit());
-//                 // Internal slave select
-//                 spi.cr1.modify(|_, w| w.ssi().set_bit());
-//                 // Master configuration
-//                 spi.cr1.modify(|_, w| w.mstr().set_bit());
+                // Bidirectional data mode enable(half-duplex communication)
+                spi.cr1.modify(|_, w| w.bidimode().clear_bit());
+                // Set MSL LSB first
+                spi.cr1.modify(|_, w| w.lsbfirst().clear_bit());
+                // Set NSS management
+                // Soft ware slave management
+                spi.cr1.modify(|_, w| w.ssm().set_bit());
+                // Internal slave select
+                spi.cr1.modify(|_, w| w.ssi().set_bit());
+                // Master configuration
+                spi.cr1.modify(|_, w| w.mstr().set_bit());
 
-//                 // Data size
-//                 spi.cr2.modify(|_, w| unsafe { w.ds().bits(0b1111) }); // 16bit
+                // Data size
+                spi.cr2.modify(|_, w| unsafe { w.ds().bits(0b1111) }); // 16bit
 
-//                 // SS output
-//                 spi.cr2.modify(|_, w| w.ssoe().clear_bit());
-//                 // Frame format
-//                 spi.cr2.modify(|_, w| w.frf().clear_bit()); // Motorola mode
+                // SS output
+                spi.cr2.modify(|_, w| w.ssoe().clear_bit());
+                // Frame format
+                spi.cr2.modify(|_, w| w.frf().clear_bit()); // Motorola mode
 
-//                 // NSS pulse management
-//                 spi.cr2.modify(|_, w| w.nssp().set_bit());
-//                 //
-//                 spi.cr1.modify(|_, w| w.spe().set_bit());
-//             }
-//         });
-//     }
-//     pub fn txrx(&self, c: u16) -> Option<u16> {
-//         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-//             None => None,
-//             Some(perip) => {
-//                 let gpiob = &perip.GPIOB;
-//                 gpiob.bsrr.write(|w| w.br6().reset());
-//                 let spi = &perip.SPI3;
+                // NSS pulse management
+                spi.cr2.modify(|_, w| w.nssp().set_bit());
+                //
+                spi.cr1.modify(|_, w| w.spe().set_bit());
+            }
+        });
+    }
+    pub fn txrx(&self, c: u16) -> Option<u16> {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => None,
+            Some(perip) => {
+                let gpiob = &perip.GPIOB;
+                gpiob.bsrr.write(|w| w.br9().reset());
+                let spi = &perip.SPI1;
 
-//                 while spi.sr.read().txe().bit_is_clear() {}
-//                 // send 8bit data automatically 2 times
-//                 spi.dr.modify(|_, w| unsafe { w.dr().bits(c.into()) });
+                while spi.sr.read().txe().bit_is_clear() {}
+                // send 8bit data automatically 2 times
+                spi.dr.modify(|_, w| unsafe { w.dr().bits(c.into()) });
 
-//                 while spi.sr.read().bsy().bit_is_set() {}
-//                 while spi.sr.read().rxne().bit_is_clear() {}
-//                 gpiob.bsrr.write(|w| w.bs6().set());
+                while spi.sr.read().bsy().bit_is_set() {}
+                while spi.sr.read().rxne().bit_is_clear() {}
+                gpiob.bsrr.write(|w| w.bs9().set());
 
-//                 let data = spi.dr.read().dr().bits();
-//                 defmt::info!("dr: {:x}", data);
-//                 Some(data & 0x3FFF)
-//             }
-//         })
-//     }
-// }
+                let data = spi.dr.read().dr().bits();
+                // defmt::info!("dr: {:x}", data);
+                Some(data & 0x3FFF)
+            }
+        })
+    }
+}
 
-// impl Encoder<f32> for Spi1 {
-//     fn get_angle(&self) -> Option<f32> {
-//         let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
-//         let p: u16 = data.count_ones() as u16 % 2; // parity
-//         self.txrx(data | (p << 15));
-//         match self.txrx(data | (p << 15)) {
-//             None => None,
-//             Some(data) => {
-//                 let deg = data as f32 / 16384.0 * 360.0;
-//                 return Some(deg.invert_360().deg2rad());
-//             }
-//         }
-//     }
-//     fn reset_error(&self) {
-//         // clear error
-//         let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
-//         let p: u16 = data.count_ones() as u16 % 2;
-//         self.txrx(data | (p << 15));
-//     }
-// }
+impl Encoder<f32> for Spi1 {
+    fn get_angle(&self) -> Option<f32> {
+        let data: u16 = 0x3FFF | 0b0100_0000_0000_0000;
+        let p: u16 = data.count_ones() as u16 % 2; // parity
+        self.txrx(data | (p << 15));
+        match self.txrx(data | (p << 15)) {
+            None => None,
+            Some(data) => {
+                let deg = data as f32 / 16384.0 * 360.0;
+                return Some(deg.invert_360().deg2rad());
+            }
+        }
+    }
+    fn reset_error(&self) {
+        // clear error
+        let data: u16 = 0x0001 | 0b0100_0000_0000_0000;
+        let p: u16 = data.count_ones() as u16 % 2;
+        self.txrx(data | (p << 15));
+    }
+}
 
 pub struct BldcPwm {}
 impl<'a> BldcPwm {

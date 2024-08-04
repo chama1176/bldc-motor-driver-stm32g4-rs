@@ -17,13 +17,13 @@ pub enum State {
     Operating120DegreeDrive,
     OperatingQPhase,
 }
-pub struct App<T0, T1, M>
-//, T2, M, E>
+pub struct App<T0, T1, M, E>
+//, T2, M>
 where
     T0: Indicator,
     T1: Indicator,
     M: ThreePhaseMotorDriver,
-    // E: Encoder<f32>,
+    E: Encoder<f32>,
 {
     tv: f32,
     count: u32,
@@ -34,18 +34,18 @@ where
     led0: T0,
     led1: T1,
     bldc: M,
-    // encoder: E,
-    // motor: ThreePhaseMotor,
+    encoder: E,
+    motor: ThreePhaseMotor,
 }
 
-impl<T0, T1, M/*, E*/> App<T0, T1, M/*, E*/>
+impl<T0, T1, M, E> App<T0, T1, M, E>
 where
     T0: Indicator,
     T1: Indicator,
     M: ThreePhaseMotorDriver,
-    // E: Encoder<f32>,
+    E: Encoder<f32>,
 {
-    pub fn new(led0: T0, led1: T1, bldc: M, /*encoder: E*/) -> Self {
+    pub fn new(led0: T0, led1: T1, bldc: M, encoder: E) -> Self {
         Self {
             tv: 0.0,
             count: 0,
@@ -55,8 +55,8 @@ where
             led0,
             led1,
             bldc,
-            // encoder,
-            // motor: ThreePhaseMotor::new(12),
+            encoder,
+            motor: ThreePhaseMotor::new(12),
         }
     }
     #[rustfmt::skip]
@@ -128,15 +128,15 @@ where
                 // }
             }
             State::OperatingQPhase =>{
-                // let ma = self.read_encoder_data();
-                // let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
+                let ma = self.read_encoder_data();
+                let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
 
-                // let tpv = DQVoltage{v_d:0.0, v_q:self.tv * 3.0}.to_three_phase(ea);
-                // tp = ThreePhaseVoltage{
-                //     v_u: (tpv.v_u + 6.0) / 12.0,
-                //     v_v: (tpv.v_v + 6.0) / 12.0,
-                //     v_w: (tpv.v_w + 6.0) / 12.0
-                // }
+                let tpv = DQVoltage{v_d:0.0, v_q:self.tv * 3.0}.to_three_phase(ea);
+                tp = ThreePhaseVoltage{
+                    v_u: (tpv.v_u + 6.0) / 12.0,
+                    v_v: (tpv.v_v + 6.0) / 12.0,
+                    v_w: (tpv.v_w + 6.0) / 12.0
+                }
             }
             State::OperatingForcedCommutation2 =>{
                 let s =((self.count as f32/(10.0*1.0)) as u32)%6;
@@ -180,7 +180,6 @@ where
         self.calib_count
     }
     pub fn read_encoder_data(&mut self) -> f32 {
-        0.0
-        // (self.encoder.get_angle().unwrap() - self.encoder_offset).wrap_to_2pi()
+        (self.encoder.get_angle().unwrap() - self.encoder_offset).wrap_to_2pi()
     }
 }

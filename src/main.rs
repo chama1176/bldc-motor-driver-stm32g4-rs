@@ -35,7 +35,7 @@ static G_APP: Mutex<
                 bldc_motor_driver_stm32g4::Led0,
                 bldc_motor_driver_stm32g4::Led1,
                 bldc_motor_driver_stm32g4::BldcPwm,
-                // bldc_motor_driver_stm32g4::Spi3,
+                bldc_motor_driver_stm32g4::Spi1,
             >,
         >,
     >,
@@ -93,11 +93,14 @@ fn main() -> ! {
 
     let spi = bldc_motor_driver_stm32g4::Spi3::new();
     spi.init();
-    // spi.reset_error();
     let led0 = bldc_motor_driver_stm32g4::Led0::new();
     led0.init();
     let led1 = bldc_motor_driver_stm32g4::Led1::new();
     led1.init();
+    let spi_enc = bldc_motor_driver_stm32g4::Spi1::new();
+    spi_enc.init();
+    spi_enc.reset_error();
+
     // let flash = bldc_motor_driver_stm32g4::FrashStorage::new();
     // flash.write();
 
@@ -109,7 +112,7 @@ fn main() -> ! {
     spi.txrx(0x800000 | 0x1B_0000);
     spi.txrx(0x000000 | 0x1B_0000);
 
-    let app = app::App::new(led0, led1, pwm/*, spi*/);
+    let app = app::App::new(led0, led1, pwm, spi_enc);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
 
     let mut t = 0;
@@ -187,9 +190,9 @@ fn main() -> ! {
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();
                         if tv > 0.1 {
-                            app.set_sate(app::State::OperatingForcedCommutation2);
+                            // app.set_sate(app::State::OperatingForcedCommutation2);
                             // app.set_sate(app::State::Operating120DegreeDrive);
-                            // app.set_sate(app::State::OperatingQPhase);
+                            app.set_sate(app::State::OperatingQPhase);
                         } else if tv < -0.5 {
                             app.set_sate(app::State::Calibrating);
                         } else {
