@@ -25,7 +25,7 @@ mod indicator;
 use crate::indicator::Indicator;
 
 use motml::encoder::Encoder;
-use motml::motor_driver;
+use motml::motor_driver::{self, ThreePhaseCurrent};
 use motml::utils::Deg;
 
 static G_APP: Mutex<
@@ -40,6 +40,7 @@ static G_APP: Mutex<
         >,
     >,
 > = Mutex::new(RefCell::new(None));
+
 
 #[interrupt]
 fn TIM3() {
@@ -79,9 +80,16 @@ fn main() -> ! {
 
     bldc_motor_driver_stm32g4::clock_init(&perip, &mut core_perip);
     bldc_motor_driver_stm32g4::adc2_init(&perip);
-    let adc_data: [u16; 7] = [77; 7];
-    let dma_buf_addr: u32 = adc_data.as_ptr() as u32;
-    bldc_motor_driver_stm32g4::dma_init(&perip, &mut core_perip, dma_buf_addr);
+    // let adc_data: [u16; 7] = [77; 7];
+    // let adcd = bldc_motor_driver_stm32g4::AdcData::new();
+
+    // let dma_buf_addr: u32 = adc_data.as_ptr() as u32;
+    // defmt::error!("addr {}", adc_data.as_ptr() as u32);
+
+    // let dma_buf_addr: u32 = adcd.data.as_ptr() as u32;
+
+    // defmt::error!("addr {}", dma_buf_addr);
+    bldc_motor_driver_stm32g4::dma_init(&perip, &mut core_perip, 0);
     bldc_motor_driver_stm32g4::dma_adc2_start(&perip);
 
     bldc_motor_driver_stm32g4::init_g_peripheral(perip);
@@ -100,6 +108,7 @@ fn main() -> ! {
     let spi_enc = bldc_motor_driver_stm32g4::Spi1::new();
     spi_enc.init();
     spi_enc.reset_error();
+
 
     // let flash = bldc_motor_driver_stm32g4::FrashStorage::new();
     // flash.write();
@@ -151,32 +160,37 @@ fn main() -> ! {
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 defmt::info!("hello from defmt");
+                // defmt::error!("addr {}", adc_data.as_ptr() as u32);
+                // defmt::error!("addr {}", adcd.data.as_ptr() as u32);
+                let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
+
+
                 write!(
                     uart,
                     "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
-                    adc_data[0],
-                    adc_data[1],
-                    adc_data[2],
-                    adc_data[3],
-                    adc_data[4],
-                    adc_data[5],
-                    adc_data[6]
+                    adcd[0],
+                    adcd[1],
+                    adcd[2],
+                    adcd[3],
+                    adcd[4],
+                    adcd[5],
+                    adcd[6]
                 )
                 .unwrap();
                 defmt::info!(
                     "{{\"ADC\":[{}, {}, {}, {}, {}, {}, {}]}}",
-                    adc_data[0],
-                    adc_data[1],
-                    adc_data[2],
-                    adc_data[3],
-                    adc_data[4],
-                    adc_data[5],
-                    adc_data[6]
+                    adcd[0],
+                    adcd[1],
+                    adcd[2],
+                    adcd[3],
+                    adcd[4],
+                    adcd[5],
+                    adcd[6]
                 );
 
                 // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
-                let mut tv = (adc_data[1] as f32 - 2000.0f32) / 1000.0f32;
+                let mut tv = (adcd[1] as f32 - 2000.0f32) / 1000.0f32;
                 if tv > 1.0 {
                     tv = 1.0;
                 }
@@ -190,13 +204,13 @@ fn main() -> ! {
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();
                         if tv > 0.1 {
-                            // app.set_sate(app::State::OperatingForcedCommutation2);
-                            // app.set_sate(app::State::Operating120DegreeDrive);
-                            app.set_sate(app::State::OperatingQPhase);
+                            // app.set_control_mode(app::ControlMode::OperatingForcedCommutation2);
+                            // app.set_control_mode(app::ControlMode::Operating120DegreeDrive);
+                            app.set_control_mode(app::ControlMode::OperatingQPhase);
                         } else if tv < -0.5 {
-                            app.set_sate(app::State::Calibrating);
+                            app.set_control_mode(app::ControlMode::Calibrating);
                         } else {
-                            app.set_sate(app::State::Waiting);
+                            app.set_control_mode(app::ControlMode::Waiting);
                         }
                     }
                 });

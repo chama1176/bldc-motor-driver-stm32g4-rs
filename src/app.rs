@@ -8,7 +8,7 @@ use motml::motor_driver::ThreePhaseValue;
 use motml::motor_driver::ThreePhaseVoltage;
 use motml::utils::Deg;
 
-pub enum State {
+pub enum ControlMode {
     Waiting,
     Calibrating,
     Operating,
@@ -28,7 +28,7 @@ where
     tv: f32,
     count: u32,
     calib_count: u8, // rad
-    state: State,
+    control_mode: ControlMode,
     encoder_offset: f32,
     //
     led0: T0,
@@ -50,7 +50,7 @@ where
             tv: 0.0,
             count: 0,
             calib_count: 0,
-            state: State::Waiting,
+            control_mode: ControlMode::Waiting,
             encoder_offset: 0.23163112,
             led0,
             led1,
@@ -65,8 +65,8 @@ where
         self.calib_count = 7;
         let mut tp = ThreePhaseVoltage::<f32> { v_u: 0., v_v: 0., v_w: 0. };
         let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
-        match self.state {
-            State::OperatingForcedCommutation =>{
+        match self.control_mode {
+            ControlMode::OperatingForcedCommutation =>{
                 match ((self.count as f32/(10.0*1.0)) as u32)%6 {
                     0 => {
                         tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.};
@@ -95,7 +95,7 @@ where
                     6_u32..=u32::MAX => (),
                 }
             }
-            State::Operating120DegreeDrive =>{
+            ControlMode::Operating120DegreeDrive =>{
                 let ma = self.read_encoder_data();
                 // let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
                 // let eadeg: f32 = ea.rad2deg();
@@ -127,7 +127,7 @@ where
                 //     assert!(false);
                 // }
             }
-            State::OperatingQPhase =>{
+            ControlMode::OperatingQPhase =>{
                 let ma = self.read_encoder_data();
                 let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
 
@@ -138,7 +138,7 @@ where
                     v_w: (tpv.v_w + 6.0) / 12.0
                 }
             }
-            State::OperatingForcedCommutation2 =>{
+            ControlMode::OperatingForcedCommutation2 =>{
                 let s =((self.count as f32/(10.0*1.0)) as u32)%6;
                 match s {
                     0 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.},
@@ -151,10 +151,10 @@ where
                 }
                 self.calib_count = s as u8;
             }
-            State::Operating => {
+            ControlMode::Operating => {
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
-            State::Calibrating => {
+            ControlMode::Calibrating => {
                 tp = ThreePhaseVoltage{ v_u: 0.3, v_v: 0.3, v_w: 0.3 };
             }
             _ =>{
@@ -173,8 +173,8 @@ where
     pub fn set_count(&mut self, c: u32) {
         self.count = c;
     }
-    pub fn set_sate(&mut self, s: State) {
-        self.state = s
+    pub fn set_control_mode(&mut self, c: ControlMode) {
+        self.control_mode = c
     }
     pub fn calib_count(&mut self) -> u8 {
         self.calib_count

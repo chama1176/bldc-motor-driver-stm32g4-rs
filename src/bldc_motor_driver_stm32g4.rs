@@ -23,6 +23,9 @@ use motml::utils::Deg;
 pub static G_PERIPHERAL: Mutex<RefCell<Option<stm32g4::stm32g431::Peripherals>>> =
     Mutex::new(RefCell::new(None));
 
+// DMAの転送先
+pub static G_ADC_DATA: Mutex<RefCell<[u16; 7]>> = Mutex::new(RefCell::new([77;7]));
+
 pub fn init_g_peripheral(perip: Peripherals) {
     free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
 }
@@ -91,6 +94,9 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 }
 
 pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals, address: u32) {
+
+    let address = free(|cs| G_ADC_DATA.borrow(cs).borrow().as_ptr() as u32);
+
     // DMAの電源投入(クロックの有効化)
     // perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().reset());
     // perip.RCC.ahb1rstr.modify(|_, w| w.dma1rst().reset());
