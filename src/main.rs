@@ -28,6 +28,7 @@ use motml::encoder::Encoder;
 use motml::motor_driver::{self, ThreePhaseCurrent};
 use motml::utils::Deg;
 
+
 static G_APP: Mutex<
     RefCell<
         Option<
@@ -44,9 +45,9 @@ static G_APP: Mutex<
 
 #[interrupt]
 fn TIM3() {
-    static mut COUNT: u32 = 0;
-    // `COUNT` has type `&mut u32` and it's safe to use
-    *COUNT += 1;
+    static mut TIM3_COUNT: u32 = 0;
+    // `TIM3_COUNT` has type `&mut u32` and it's safe to use
+    *TIM3_COUNT += 1;
 
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
@@ -62,12 +63,27 @@ fn TIM3() {
         match G_APP.borrow(cs).borrow_mut().deref_mut() {
             None => (),
             Some(app) => {
-                app.set_count(COUNT.clone());
+                app.set_count(TIM3_COUNT.clone());
                 app.periodic_task();
             }
         }
     });
 }
+defmt::timestamp!("{=u32:us}", {
+    // NOTE(interrupt-safe) single instruction volatile read operation
+    free(|cs| {
+        match bldc_motor_driver_stm32g4::G_PERIPHERAL
+            .borrow(cs)
+            .borrow()
+            .as_ref()
+        {
+            None => 0,
+            Some(perip) => {
+                perip.TIM3.cnt.read().cnt().bits() as u32
+            }
+        }
+    })
+});
 
 #[entry]
 fn main() -> ! {
