@@ -93,13 +93,11 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 }
 
-pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals, address: u32) {
+pub fn dma_init(perip: &Peripherals) {
 
     let address = free(|cs| G_ADC_DATA.borrow(cs).borrow().as_ptr() as u32);
 
     // DMAの電源投入(クロックの有効化)
-    // perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().reset());
-    // perip.RCC.ahb1rstr.modify(|_, w| w.dma1rst().reset());
     perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().set_bit());
     perip.RCC.ahb1rstr.modify(|_, w| w.dma1rst().set_bit());
     perip.RCC.ahb1rstr.modify(|_, w| w.dmamux1rst().clear_bit());
@@ -137,15 +135,12 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals, address: 
 
     let adc = &perip.ADC2;
     let adc_data_register_addr = &adc.dr as *const _ as u32;
-    // let adc_dma_buf_addr : u32 = adc_dma_buf as *const [u16; 4] as u32;
-    // perip.DMA1.cpar1.modify(|_, w| unsafe { w.pa().bits(*adc.dr.as_ptr()) });   // peripheral address
     perip
         .DMA1
         .cpar1
         .modify(|_, w| unsafe { w.pa().bits(adc_data_register_addr) }); // peripheral address
-                                                                        // perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(adc_dma_buf.len() as u16) }); // num
     perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(7) }); // num
-                                                                 // perip.DMA1.cmar1.modify(|_, w| unsafe { w.ma().bits(adc_dma_buf_addr) });      // memory address
+
     perip
         .DMA1
         .cmar1

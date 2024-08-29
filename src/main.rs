@@ -69,6 +69,7 @@ fn TIM3() {
         }
     });
 }
+
 defmt::timestamp!("{=u32:us}", {
     // NOTE(interrupt-safe) single instruction volatile read operation
     free(|cs| {
@@ -96,16 +97,8 @@ fn main() -> ! {
 
     bldc_motor_driver_stm32g4::clock_init(&perip, &mut core_perip);
     bldc_motor_driver_stm32g4::adc2_init(&perip);
-    // let adc_data: [u16; 7] = [77; 7];
-    // let adcd = bldc_motor_driver_stm32g4::AdcData::new();
 
-    // let dma_buf_addr: u32 = adc_data.as_ptr() as u32;
-    // defmt::error!("addr {}", adc_data.as_ptr() as u32);
-
-    // let dma_buf_addr: u32 = adcd.data.as_ptr() as u32;
-
-    // defmt::error!("addr {}", dma_buf_addr);
-    bldc_motor_driver_stm32g4::dma_init(&perip, &mut core_perip, 0);
+    bldc_motor_driver_stm32g4::dma_init(&perip);
     bldc_motor_driver_stm32g4::dma_adc2_start(&perip);
 
     bldc_motor_driver_stm32g4::init_g_peripheral(perip);
@@ -176,10 +169,7 @@ fn main() -> ! {
                 // uart.write_str("hello ");
                 // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 defmt::info!("hello from defmt");
-                // defmt::error!("addr {}", adc_data.as_ptr() as u32);
-                // defmt::error!("addr {}", adcd.data.as_ptr() as u32);
                 let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
-
 
                 write!(
                     uart,
