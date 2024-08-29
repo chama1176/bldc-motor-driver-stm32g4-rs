@@ -14,6 +14,8 @@ runner = [
   "STM32G431RBTx",
   "--log-format",
   "{L} {s}",
+  "--probe",
+  "0483:374f",
 ]
 # runner = "gdb-multiarch -q -x openocd.gdb"
 # runner = "gdb -q -x openocd.gdb"

@@ -93,7 +93,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 }
 
-pub fn dma_init(perip: &Peripherals) {
+pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 
     let address = free(|cs| G_ADC_DATA.borrow(cs).borrow().as_ptr() as u32);
 
@@ -121,7 +121,7 @@ pub fn dma_init(perip: &Peripherals) {
     perip.DMA1.ccr1.modify(|_, w| w.dir().clear_bit()); // read from peripheral
     perip.DMA1.ccr1.modify(|_, w| w.teie().clear_bit()); // transfer error interrupt enable
     perip.DMA1.ccr1.modify(|_, w| w.htie().clear_bit()); // half transfer interrupt enable
-    perip.DMA1.ccr1.modify(|_, w| w.tcie().clear_bit()); // transfer complete interrupt enable
+    perip.DMA1.ccr1.modify(|_, w| w.tcie().set_bit()); // transfer complete interrupt enable
 
     // For category 2 devices:
     // • DMAMUX channels 0 to 5 are connected to DMA1 channels 1 to 6
@@ -147,12 +147,10 @@ pub fn dma_init(perip: &Peripherals) {
         .modify(|_, w| unsafe { w.ma().bits(address) }); // memory address
 
     // 割り込み設定
-    // unsafe{
-    //     core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0);
-    //     NVIC::unmask(Interrupt::DMA1_CH1);
-    //     core_perip.NVIC.set_priority(Interrupt::ADC1_2, 0);
-    //     NVIC::unmask(Interrupt::ADC1_2);
-    // }
+    unsafe{
+        core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0);
+        NVIC::unmask(Interrupt::DMA1_CH1);
+    }
 }
 
 pub fn adc2_init(perip: &Peripherals) {
