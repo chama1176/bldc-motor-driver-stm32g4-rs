@@ -75,8 +75,8 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // For main task
     let tim3 = &perip.TIM3;
     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
-    tim3.psc.modify(|_, w| unsafe { w.bits(14 - 1) });
-    tim3.arr.modify(|_, w| unsafe { w.bits(10_000 - 1) }); // 1kHz
+    tim3.psc.modify(|_, w| unsafe { w.bits(1_400 - 1) });
+    tim3.arr.modify(|_, w| unsafe { w.bits(10_000 - 1) }); // 10Hz
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 

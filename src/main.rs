@@ -82,6 +82,9 @@ fn DMA1_CH1(){
 #[interrupt]
 fn TIM3() {
 
+    // mainで初期化済み
+    let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
+
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
@@ -94,6 +97,46 @@ fn TIM3() {
             }
         }
     });
+    free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
+        None => (),
+        Some(app) => {
+
+            let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
+            write!(
+                uart,
+                "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
+                adcd[0],
+                adcd[1],
+                adcd[2],
+                adcd[3],
+                adcd[4],
+                adcd[5],
+                adcd[6]
+            )
+            .unwrap();
+
+            let mut tv = (adcd[1] as f32 - 2000.0f32) / 1000.0f32;
+            if tv > 1.0 {
+                tv = 1.0;
+            }
+
+            app.led_tick_task();
+            app.set_target_velocity(tv);
+            // rad = app.read_encoder_data();
+            // calib_count = app.calib_count();
+            if tv > 0.1 {
+                // app.set_control_mode(app::ControlMode::OperatingForcedCommutation2);
+                // app.set_control_mode(app::ControlMode::Operating120DegreeDrive);
+                app.set_control_mode(app::ControlMode::OperatingQPhase);
+            } else if tv < -0.5 {
+                app.set_control_mode(app::ControlMode::Calibrating);
+            } else {
+                app.set_control_mode(app::ControlMode::Waiting);
+            }
+        }
+    });
+
+
 }
 
 defmt::timestamp!("{=u32:us}", {
@@ -152,6 +195,7 @@ fn main() -> ! {
     // Change Buck Convetor Frequency
     // spi.txrx(0x917000);
     // spi.txrx(0x110000);
+
     // Set Dead Time
     spi.txrx(0x800000 | 0x1B_0000);
     spi.txrx(0x000000 | 0x1B_0000);
@@ -197,53 +241,15 @@ fn main() -> ! {
                 defmt::info!("hello from defmt");
                 let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
 
-                write!(
-                    uart,
-                    "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
-                    adcd[0],
-                    adcd[1],
-                    adcd[2],
-                    adcd[3],
-                    adcd[4],
-                    adcd[5],
-                    adcd[6]
-                )
-                .unwrap();
-                defmt::info!(
-                    "{{\"ADC\":[{}, {}, {}, {}, {}, {}, {}]}}",
-                    adcd[0],
-                    adcd[1],
-                    adcd[2],
-                    adcd[3],
-                    adcd[4],
-                    adcd[5],
-                    adcd[6]
-                );
-
                 // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
-                let mut tv = (adcd[1] as f32 - 2000.0f32) / 1000.0f32;
-                if tv > 1.0 {
-                    tv = 1.0;
-                }
                 let mut rad = 0.;
                 let mut calib_count = 7;
                 free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
                     None => (),
                     Some(app) => {
-                        app.led_tick_task();
-                        app.set_target_velocity(tv);
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();
-                        if tv > 0.1 {
-                            // app.set_control_mode(app::ControlMode::OperatingForcedCommutation2);
-                            // app.set_control_mode(app::ControlMode::Operating120DegreeDrive);
-                            app.set_control_mode(app::ControlMode::OperatingQPhase);
-                        } else if tv < -0.5 {
-                            app.set_control_mode(app::ControlMode::Calibrating);
-                        } else {
-                            app.set_control_mode(app::ControlMode::Waiting);
-                        }
                     }
                 });
                 let deg = rad.rad2deg();
