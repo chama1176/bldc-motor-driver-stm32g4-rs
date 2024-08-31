@@ -35,7 +35,7 @@ where
     led1: T1,
     bldc: M,
     encoder: E,
-    motor: ThreePhaseMotor,
+    pub motor: ThreePhaseMotor,
 }
 
 impl<T0, T1, M, E> App<T0, T1, M, E>
@@ -64,7 +64,7 @@ where
         self.led0.toggle();
         self.calib_count = 7;
         let mut tp = ThreePhaseVoltage::<f32> { v_u: 0., v_v: 0., v_w: 0. };
-        let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
+        let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Disable, v: OutputStatus::Disable, w: OutputStatus::Disable };
         match self.control_mode {
             ControlMode::OperatingForcedCommutation =>{
                 match ((self.count as f32/(10.0*1.0)) as u32)%6 {
@@ -96,6 +96,7 @@ where
                 }
             }
             ControlMode::Operating120DegreeDrive =>{
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
                 let ma = self.read_encoder_data();
                 // let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
                 // let eadeg: f32 = ea.rad2deg();
@@ -128,6 +129,7 @@ where
                 // }
             }
             ControlMode::OperatingQPhase =>{
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
                 let ma = self.read_encoder_data();
                 let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
 
@@ -139,6 +141,7 @@ where
                 }
             }
             ControlMode::OperatingForcedCommutation2 =>{
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
                 let s =((self.count as f32/(10.0*1.0)) as u32)%6;
                 match s {
                     0 => tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.},
@@ -152,12 +155,15 @@ where
                 self.calib_count = s as u8;
             }
             ControlMode::Operating => {
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
             ControlMode::Calibrating => {
-                tp = ThreePhaseVoltage{ v_u: 0.3, v_v: 0.3, v_w: 0.3 };
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable };
+                tp = ThreePhaseVoltage{ v_u: 0.6, v_v: 0.4, v_w: 0.0 };
             }
             _ =>{
+                tpe = ThreePhaseValue { u: OutputStatus::Disable, v: OutputStatus::Disable, w: OutputStatus::Disable };
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
         }

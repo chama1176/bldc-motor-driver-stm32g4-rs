@@ -27,6 +27,7 @@ use crate::indicator::Indicator;
 use motml::encoder::Encoder;
 use motml::motor_driver::{self, ThreePhaseCurrent};
 use motml::utils::Deg;
+use motml::motor::ThreePhaseMotor;
 
 
 static G_APP: Mutex<
@@ -100,7 +101,6 @@ fn TIM3() {
     free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
         None => (),
         Some(app) => {
-
             let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
             write!(
                 uart,
@@ -115,6 +115,54 @@ fn TIM3() {
             )
             .unwrap();
 
+            // I = V / R
+            // 60V/V, 0.003
+            let current = ThreePhaseCurrent::<f32> {
+                i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003,
+                i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003,
+                i_w: 0.0,
+            };
+            let ma = app.read_encoder_data();
+            let ea = app.motor.mechanical_angle_to_electrical_angle(ma);
+            let dq = current.to_dq(ea);
+
+            // floatのまま送るとFLASHをバカほど食うのでcastする
+            write!(
+                uart,
+                "{{\"ea\":{:4}}}\r\n",
+                (ea * 1000.0) as i32,
+            )
+            .unwrap();
+            
+            // floatのまま送るとFLASHをバカほど食うのでcastする
+            write!(
+                uart,
+                "{{\"iu\":{:4}}}\r\n",
+                (current.i_u * 1000.0) as i32,
+            )
+            .unwrap();
+            // floatのまま送るとFLASHをバカほど食うのでcastする
+            write!(
+                uart,
+                "{{\"iv\":{:4}}}\r\n",
+                (current.i_v * 1000.0) as i32,
+            )
+            .unwrap();
+            
+            // floatのまま送るとFLASHをバカほど食うのでcastする
+            write!(
+                uart,
+                "{{\"d\":{:4}}}\r\n",
+                (dq.i_d * 1000.0) as i32,
+            )
+            .unwrap();
+            write!(
+                uart,
+                "{{\"q\":{:4}}}\r\n",
+                (dq.i_q * 1000.0) as i32,
+            )
+            .unwrap();
+
             let mut tv = (adcd[1] as f32 - 2000.0f32) / 1000.0f32;
             if tv > 1.0 {
                 tv = 1.0;
@@ -122,8 +170,6 @@ fn TIM3() {
 
             app.led_tick_task();
             app.set_target_velocity(tv);
-            // rad = app.read_encoder_data();
-            // calib_count = app.calib_count();
             if tv > 0.1 {
                 // app.set_control_mode(app::ControlMode::OperatingForcedCommutation2);
                 // app.set_control_mode(app::ControlMode::Operating120DegreeDrive);
@@ -233,15 +279,10 @@ fn main() -> ! {
             }
         });
         if (t + 10000 - prev) % 10000 >= 1000 {
-            // 0.1ms
             cnt += 1;
             if cnt > 5000 {
-                // uart.write_str("hello ");
-                // write!(uart, "{} + {} = {}\r\n", 2, 4, 2+4);
                 defmt::info!("hello from defmt");
-                let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
 
-                // adc_data[4] 2000 ~ 6000 c: 4000
                 cnt = 0;
                 let mut rad = 0.;
                 let mut calib_count = 7;
