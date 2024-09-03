@@ -30,6 +30,10 @@ where
     calib_count: u8, // rad
     control_mode: ControlMode,
     encoder_offset: f32,
+    pub last_electrical_angle: f32, // debug
+    pub last_mechanical_angle: f32, // debug
+    pub last_tim_count: u32,
+    pub diff_count: u32,
     //
     led0: T0,
     led1: T1,
@@ -51,7 +55,12 @@ where
             count: 0,
             calib_count: 0,
             control_mode: ControlMode::Waiting,
-            encoder_offset: 0.23163112,
+            encoder_offset: 0.238,
+            // encoder_offset: 0.0,
+            last_electrical_angle: 0.0,
+            last_mechanical_angle: 0.0,
+            last_tim_count: 0,
+            diff_count: 0,
             led0,
             led1,
             bldc,
@@ -62,7 +71,12 @@ where
     #[rustfmt::skip]
     pub fn periodic_task(&mut self) {
         self.led0.toggle();
+        let ma = self.read_encoder_data();
+        let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
+        self.last_mechanical_angle = ma;
+        self.last_electrical_angle = ea;
         self.calib_count = 7;
+
         let mut tp = ThreePhaseVoltage::<f32> { v_u: 0., v_v: 0., v_w: 0. };
         let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Disable, v: OutputStatus::Disable, w: OutputStatus::Disable };
         match self.control_mode {
@@ -97,43 +111,38 @@ where
             }
             ControlMode::Operating120DegreeDrive =>{
                 tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
-                let ma = self.read_encoder_data();
-                // let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
-                // let eadeg: f32 = ea.rad2deg();
-                // if 0.0 <= eadeg && eadeg < 60.0 {
-                //     tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.};
-                //     tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
-                // }
-                // else if eadeg < 120.0 {
-                //     tp = ThreePhaseVoltage{v_u: 0.25, v_v: 0., v_w: 0.};
-                //     tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Disable, w: OutputStatus::Enable};
-                // }
-                // else if eadeg < 180.0 {
-                //     tp = ThreePhaseVoltage{v_u: 0., v_v: 0.25, v_w: 0.};
-                //     tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
-                // }
-                // else if eadeg < 240.0 {
-                //     tp = ThreePhaseVoltage{v_u: 0., v_v: 0.25, v_w: 0.};
-                //     tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
-                // }
-                // else if eadeg < 300.0 {
-                //     tp = ThreePhaseVoltage{v_u: 0., v_v: 0., v_w: 0.25};
-                //     tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Disable, w: OutputStatus::Enable};
-                // }
-                // else if eadeg < 360.0 {
-                //     tp = ThreePhaseVoltage{v_u: 0., v_v: 0., v_w: 0.25};
-                //     tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
-                // }
-                // else {
-                //     assert!(false);
-                // }
+                let eadeg: f32 = ea.rad2deg();
+                if 210.0 <= eadeg && eadeg < 270.0 {
+                    tp = ThreePhaseVoltage{v_u: 0.1, v_v: 0., v_w: 0.};
+                    tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
+                }
+                else if 270.0 <= eadeg && eadeg < 330.0 {
+                    tp = ThreePhaseVoltage{v_u: 0.1, v_v: 0., v_w: 0.};
+                    tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Disable, w: OutputStatus::Enable};
+                }
+                else if (330.0 <= eadeg && eadeg < 360.0) || (0.0 <= eadeg && eadeg < 30.0){
+                    tp = ThreePhaseVoltage{v_u: 0., v_v: 0.1, v_w: 0.};
+                    tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
+                }
+                else if 30.0 <= eadeg && eadeg < 90.0 {
+                    tp = ThreePhaseVoltage{v_u: 0., v_v: 0.1, v_w: 0.};
+                    tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable};
+                }
+                else if 90.0 <= eadeg && eadeg < 150.0 {
+                    tp = ThreePhaseVoltage{v_u: 0., v_v: 0., v_w: 0.1};
+                    tpe = ThreePhaseValue{u: OutputStatus::Enable, v: OutputStatus::Disable, w: OutputStatus::Enable};
+                }
+                else if 150.0 <= eadeg && eadeg < 210.0 {
+                    tp = ThreePhaseVoltage{v_u: 0., v_v: 0., v_w: 0.1};
+                    tpe = ThreePhaseValue{u: OutputStatus::Disable, v: OutputStatus::Enable, w: OutputStatus::Enable};
+                }
+                else {
+                    assert!(false);
+                }
             }
             ControlMode::OperatingQPhase =>{
                 tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
-                let ma = self.read_encoder_data();
-                let ea = self.motor.mechanical_angle_to_electrical_angle(ma);
-
-                let tpv = DQVoltage{v_d:0.0, v_q:self.tv * 3.0}.to_three_phase(ea);
+                let tpv = DQVoltage{v_d:0.0, v_q:self.tv * 1.0}.to_three_phase(ea);
                 tp = ThreePhaseVoltage{
                     v_u: (tpv.v_u + 6.0) / 12.0,
                     v_v: (tpv.v_v + 6.0) / 12.0,
@@ -159,8 +168,8 @@ where
                 tp = ThreePhaseVoltage{ v_u: 0., v_v: 0., v_w: 0. };
             }
             ControlMode::Calibrating => {
-                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable };
-                tp = ThreePhaseVoltage{ v_u: 0.6, v_v: 0.4, v_w: 0.0 };
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
+                tp = ThreePhaseVoltage{ v_u: 0.6, v_v: 0.4, v_w: 0.4 };
             }
             _ =>{
                 tpe = ThreePhaseValue { u: OutputStatus::Disable, v: OutputStatus::Disable, w: OutputStatus::Disable };

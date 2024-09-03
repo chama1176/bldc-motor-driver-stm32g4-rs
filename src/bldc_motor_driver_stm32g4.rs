@@ -75,8 +75,8 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // For main task
     let tim3 = &perip.TIM3;
     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
-    tim3.psc.modify(|_, w| unsafe { w.bits(1_400 - 1) });
-    tim3.arr.modify(|_, w| unsafe { w.bits(10_000 - 1) }); // 10Hz
+    tim3.psc.modify(|_, w| unsafe { w.bits(280 - 1) });
+    tim3.arr.modify(|_, w| unsafe { w.bits(50_000 - 1) }); // 10Hz, 16bit
     tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
@@ -87,8 +87,8 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 
     // For ADC
     let tim6 = &perip.TIM6;
-    tim6.psc.modify(|_, w| unsafe { w.bits(14_000 - 1) });
-    tim6.arr.modify(|_, w| unsafe { w.bits(10 - 1) }); // 1kHz
+    tim6.psc.modify(|_, w| unsafe { w.bits(1400 - 1) });
+    tim6.arr.modify(|_, w| unsafe { w.bits(10 - 1) }); // 10kHz
     tim6.dier.modify(|_, w| w.uie().set_bit());
     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 }
@@ -588,7 +588,8 @@ impl Spi1 {
                 spi.cr1.modify(|_, w| w.spe().clear_bit());
 
                 // Set Baudrate
-                spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0111) }); // f_pclk / 256
+                // spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0100) }); // f_pclk / 32
+                spi.cr1.modify(|_, w| unsafe { w.br().bits(0b0001) }); // f_pclk / 4
 
                 // Set Clock polarity
                 spi.cr1.modify(|_, w| w.cpol().clear_bit()); // idle low

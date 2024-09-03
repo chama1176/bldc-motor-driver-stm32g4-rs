@@ -3,6 +3,7 @@
 
 // pick a panicking behavior
 use core::cell::RefCell;
+use core::clone;
 use core::fmt::Write;
 use core::ops::DerefMut;
 use defmt_rtt as _;
@@ -50,7 +51,7 @@ fn DMA1_CH1(){
     static mut TIM3_COUNT: u32 = 0;
     // `TIM3_COUNT` has type `&mut u32` and it's safe to use
     *TIM3_COUNT += 1;
-
+    let mut tim_count = 0;
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
@@ -67,6 +68,7 @@ fn DMA1_CH1(){
                     perip.DMA1.ifcr.write(|w| w.gif1().set_bit());
                     return;
                 }
+                tim_count = perip.TIM3.cnt.read().cnt().bits();
             }
         }
         match G_APP.borrow(cs).borrow_mut().deref_mut() {
@@ -74,6 +76,8 @@ fn DMA1_CH1(){
             Some(app) => {
                 app.set_count(TIM3_COUNT.clone());
                 app.periodic_task();
+                app.diff_count = tim_count as u32 - app.last_tim_count;
+                app.last_tim_count = tim_count as u32;
             }
         }
     });
@@ -118,19 +122,27 @@ fn TIM3() {
             // I = V / R
             // 60V/V, 0.003
             let current = ThreePhaseCurrent::<f32> {
-                i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003,
-                i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003,
+                i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - 0.0,
+                i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - 0.0,
                 i_w: 0.0,
             };
-            let ma = app.read_encoder_data();
-            let ea = app.motor.mechanical_angle_to_electrical_angle(ma);
-            let dq = current.to_dq(ea);
+            let dq = current.to_dq(app.last_electrical_angle);
+
+            // defmt::info!("diff: {}", app.diff_count);
 
             // floatのまま送るとFLASHをバカほど食うのでcastする
             write!(
                 uart,
                 "{{\"ea\":{:4}}}\r\n",
-                (ea * 1000.0) as i32,
+                (app.last_electrical_angle * 1000.0) as i32,
+            )
+            .unwrap();
+            
+            // floatのまま送るとFLASHをバカほど食うのでcastする
+            write!(
+                uart,
+                "{{\"ma\":{:4}}}\r\n",
+                (app.last_mechanical_angle * 1000.0) as i32,
             )
             .unwrap();
             
@@ -280,8 +292,8 @@ fn main() -> ! {
         });
         if (t + 10000 - prev) % 10000 >= 1000 {
             cnt += 1;
-            if cnt > 5000 {
-                defmt::info!("hello from defmt");
+            if cnt > 500 {
+                // defmt::info!("hello from defmt");
 
                 cnt = 0;
                 let mut rad = 0.;
