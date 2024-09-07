@@ -81,7 +81,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
     unsafe {
-        core_perip.NVIC.set_priority(Interrupt::TIM3, 0);
+        core_perip.NVIC.set_priority(Interrupt::TIM3, 0b10);
         NVIC::unmask(Interrupt::TIM3);
     }
 
@@ -148,7 +148,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 
     // 割り込み設定
     unsafe{
-        core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0);
+        core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0b0);
         NVIC::unmask(Interrupt::DMA1_CH1);
     }
 }
