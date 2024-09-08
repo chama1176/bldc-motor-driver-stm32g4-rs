@@ -88,7 +88,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // For ADC
     let tim6 = &perip.TIM6;
     tim6.psc.modify(|_, w| unsafe { w.bits(1400 - 1) });
-    tim6.arr.modify(|_, w| unsafe { w.bits(10 - 1) }); // 10kHz
+    tim6.arr.modify(|_, w| unsafe { w.bits(20 - 1) }); // 5kHz
     tim6.dier.modify(|_, w| w.uie().set_bit());
     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 }
@@ -255,6 +255,32 @@ pub fn dma_adc2_start(perip: &Peripherals) {
 
     // Start ADC
     adc.cr.modify(|_, w| w.adstart().start()); // ADC start
+}
+
+/// ADCは別で実装されている前提
+pub struct CurrentSensor {
+    u_current_offset: f32,
+    v_current_offset: f32,
+}
+impl<'a> CurrentSensor {
+    pub fn new() -> Self {
+        Self {
+            u_current_offset: 0.0,
+            v_current_offset: -0.0,
+        }
+    }
+    /// Return value in Ampere
+    pub fn get_current(&self) -> ThreePhaseCurrent<f32> {
+        let adcd =  free(|cs| G_ADC_DATA.borrow(cs).borrow().clone());
+        // I = V / R
+        // 60V/V, 0.003
+        // 基準電圧1.5V
+        ThreePhaseCurrent::<f32> {
+            i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - self.u_current_offset,
+            i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - self.v_current_offset,
+            i_w: 0.0,
+        }
+    }
 }
 
 // TODO: Need to check
