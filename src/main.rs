@@ -89,10 +89,6 @@ fn TIM3() {
 
     // mainで初期化済み
     let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
-    let mut adcd: [u16; 7] = [0; 7];
-    let mut electrical_angle = 0.0;
-    let mut mechanical_angle = 0.0;
-    let mut diff_count = 0;
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
@@ -110,10 +106,7 @@ fn TIM3() {
             return;
         },
         Some(app) => {
-            adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
-            electrical_angle = app.last_electrical_angle;
-            mechanical_angle = app.last_mechanical_angle;
-            diff_count = app.diff_count;
+            let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
 
             let mut tv = (adcd[1] as f32 - 2000.0f32) / 1000.0f32;
             if tv > 1.0 {
@@ -135,74 +128,6 @@ fn TIM3() {
     });
 
 
-    write!(
-        uart,
-        "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
-        adcd[0],
-        adcd[1],
-        adcd[2],
-        adcd[3],
-        adcd[4],
-        adcd[5],
-        adcd[6]
-    )
-    .unwrap();
-
-    // I = V / R
-    // 60V/V, 0.003
-    let current = ThreePhaseCurrent::<f32> {
-        i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - 0.0,
-        i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - 0.0,
-        i_w: 0.0,
-    };
-    let dq = current.to_dq(electrical_angle);
-
-    defmt::info!("diff: {}", diff_count);
-
-    // floatのまま送るとFLASHをバカほど食うのでcastする
-    write!(
-        uart,
-        "{{\"ea\":{:4}}}\r\n",
-        (electrical_angle * 1000.0) as i32,
-    )
-    .unwrap();
-    
-    // floatのまま送るとFLASHをバカほど食うのでcastする
-    write!(
-        uart,
-        "{{\"ma\":{:4}}}\r\n",
-        (mechanical_angle * 1000.0) as i32,
-    )
-    .unwrap();
-    
-    // floatのまま送るとFLASHをバカほど食うのでcastする
-    write!(
-        uart,
-        "{{\"iu\":{:4}}}\r\n",
-        (current.i_u * 1000.0) as i32,
-    )
-    .unwrap();
-    // floatのまま送るとFLASHをバカほど食うのでcastする
-    write!(
-        uart,
-        "{{\"iv\":{:4}}}\r\n",
-        (current.i_v * 1000.0) as i32,
-    )
-    .unwrap();
-    
-    // floatのまま送るとFLASHをバカほど食うのでcastする
-    write!(
-        uart,
-        "{{\"d\":{:4}}}\r\n",
-        (dq.i_d * 1000.0) as i32,
-    )
-    .unwrap();
-    write!(
-        uart,
-        "{{\"q\":{:4}}}\r\n",
-        (dq.i_q * 1000.0) as i32,
-    )
-    .unwrap();
 
 }
 
@@ -301,10 +226,15 @@ fn main() -> ! {
         });
         if (t + 10000 - prev) % 10000 >= 1000 {
             cnt += 1;
-            if cnt > 500 {
+            if cnt > 50 {
                 // defmt::info!("hello from defmt");
 
                 cnt = 0;
+                let mut adcd: [u16; 7] = [0; 7];
+                let mut electrical_angle = 0.0;
+                let mut mechanical_angle = 0.0;
+                let mut diff_count = 0;
+
                 let mut rad = 0.;
                 let mut calib_count = 7;
                 free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
@@ -312,12 +242,89 @@ fn main() -> ! {
                     Some(app) => {
                         rad = app.read_encoder_data();
                         calib_count = app.calib_count();
+                        adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
+                        electrical_angle = app.last_electrical_angle;
+                        mechanical_angle = app.last_mechanical_angle;
+                        diff_count = app.diff_count;
+            
                     }
                 });
                 let deg = rad.rad2deg();
                 defmt::info!("deg: {}, rad: {}", deg, rad);
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();
                 // write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
+
+                write!(
+                    uart,
+                    "{{\"ADC\":[{:4}, {:4}, {:4}, {:4}, {:4}, {:4}, {:4}]}}\r\n",
+                    adcd[0],
+                    adcd[1],
+                    adcd[2],
+                    adcd[3],
+                    adcd[4],
+                    adcd[5],
+                    adcd[6]
+                )
+                .unwrap();
+            
+                // I = V / R
+                // 60V/V, 0.003
+                let current = ThreePhaseCurrent::<f32> {
+                    i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - 0.0,
+                    i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - 0.0,
+                    i_w: 0.0,
+                };
+                let dq = current.to_dq(electrical_angle);
+            
+                defmt::info!("diff: {}", diff_count);
+            
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"ea\":{:4}}}\r\n",
+                    (electrical_angle * 1000.0) as i32,
+                )
+                .unwrap();
+                
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"ma\":{:4}}}\r\n",
+                    (mechanical_angle * 1000.0) as i32,
+                )
+                .unwrap();
+                
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"iu\":{:4}}}\r\n",
+                    (current.i_u * 1000.0) as i32,
+                )
+                .unwrap();
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"iv\":{:4}}}\r\n",
+                    (current.i_v * 1000.0) as i32,
+                )
+                .unwrap();
+                
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"d\":{:4}}}\r\n",
+                    (dq.i_d * 1000.0) as i32,
+                )
+                .unwrap();
+                write!(
+                    uart,
+                    "{{\"q\":{:4}}}\r\n",
+                    (dq.i_q * 1000.0) as i32,
+                )
+                .unwrap();
+            
+
+
             }
             prev = t;
         }
