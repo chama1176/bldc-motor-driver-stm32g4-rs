@@ -185,8 +185,8 @@ where
                 self.control_err_integral.i_d += err_current.i_d;
                 self.control_err_integral.i_q += err_current.i_q;
 
-                self.control_err_integral.i_d = self.control_err_integral.i_d.clamp(-1.0, 1.0);
-                self.control_err_integral.i_q = self.control_err_integral.i_q.clamp(-1.0, 1.0);
+                // self.control_err_integral.i_d = self.control_err_integral.i_d.clamp(-1.0, 1.0);
+                // self.control_err_integral.i_q = self.control_err_integral.i_q.clamp(-1.0, 1.0);
                 
                 tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
                 let tpv = DQVoltage{

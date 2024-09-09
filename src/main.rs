@@ -245,7 +245,7 @@ fn main() -> ! {
                 free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
                     None => (),
                     Some(app) => {
-                        rad = app.read_encoder_data();
+                        // rad = app.read_encoder_data();
                         calib_count = app.calib_count();
                         adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
                         electrical_angle = app.last_electrical_angle;
@@ -256,8 +256,6 @@ fn main() -> ! {
             
                     }
                 });
-                let deg = rad.rad2deg();
-                defmt::info!("deg: {}, rad: {}", deg, rad);
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();
                 // write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
 
@@ -274,7 +272,7 @@ fn main() -> ! {
                 // )
                 // .unwrap();
                         
-                // defmt::info!("diff: {}", diff_count);
+                defmt::info!("diff: {}", diff_count);
             
                 // // floatのまま送るとFLASHをバカほど食うのでcastする
                 // write!(

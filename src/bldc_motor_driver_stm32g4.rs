@@ -88,7 +88,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // For ADC
     let tim6 = &perip.TIM6;
     tim6.psc.modify(|_, w| unsafe { w.bits(1400 - 1) });
-    tim6.arr.modify(|_, w| unsafe { w.bits(20 - 1) }); // 5kHz
+    tim6.arr.modify(|_, w| unsafe { w.bits(10 - 1) }); // 10kHz
     tim6.dier.modify(|_, w| w.uie().set_bit());
     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 }
