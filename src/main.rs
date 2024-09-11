@@ -15,7 +15,7 @@ use cortex_m_rt::entry;
 
 use stm32g4::stm32g431;
 use stm32g4::stm32g431::interrupt;
-use stm32g4::stm32g431::Interrupt::{TIM3, DMA1_CH1}; // you can put a breakpoint on `rust_begin_unwind` to catch panics
+use stm32g4::stm32g431::Interrupt::{TIM3, DMA1_CH1, DMA1_CH2}; // you can put a breakpoint on `rust_begin_unwind` to catch panics
                                          // use panic_abort as _; // requires nightly
                                          // use panic_itm as _; // logs messages over ITM; requires ITM support
                                          // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
@@ -83,6 +83,29 @@ fn DMA1_CH1(){
         }
     });
 
+}
+
+#[interrupt]
+fn DMA1_CH2(){
+    free(|cs| {
+        match bldc_motor_driver_stm32g4::G_PERIPHERAL
+            .borrow(cs)
+            .borrow()
+            .as_ref()
+        {
+            None => (),
+            Some(perip) => {
+                if perip.DMA1.isr.read().tcif2().bit_is_set() {
+                    perip.DMA1.ifcr.write(|w| w.tcif2().set_bit());
+                }else{
+                    // 想定と違う割り込み要因
+                    defmt::error!("Something went wrong!");
+                    perip.DMA1.ifcr.write(|w| w.gif2().set_bit());
+                    return;
+                }
+            }
+        }
+    });
 }
 
 #[interrupt]

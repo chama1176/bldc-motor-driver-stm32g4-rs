@@ -105,6 +105,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.ahb1enr.modify(|_, w| w.dmamuxen().set_bit());
     perip.RCC.ahb1enr.modify(|_, w| w.dma1en().set_bit());
 
+    // DMA1 ch1
     perip.DMA1.ccr1.modify(|_, w| unsafe { w.pl().bits(0b10) }); // priority level 2
     perip
         .DMA1
@@ -125,7 +126,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 
     // For category 2 devices:
     // • DMAMUX channels 0 to 5 are connected to DMA1 channels 1 to 6
-    // • DMAMUX channels 6 to 11 are connected to DMA1 channels 1 to 6
+    // • DMAMUX channels 6 to 11 are connected to DMA2 channels 1 to 6
     // DMA1 ch1 -> DMAMUX ch6
     perip
         .DMAMUX
@@ -151,6 +152,57 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
         core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0b0);
         NVIC::unmask(Interrupt::DMA1_CH1);
     }
+
+    // DMA1 ch2
+    perip.DMA1.ccr2.modify(|_, w| unsafe { w.pl().bits(0b01) }); // priority level 2
+    perip
+        .DMA1
+        .ccr2
+        .modify(|_, w| unsafe { w.msize().bits(0b00) }); // 8bit
+    perip
+        .DMA1
+        .ccr2
+        .modify(|_, w| unsafe { w.psize().bits(0b00) }); // 8bit
+    perip.DMA1.ccr2.modify(|_, w| w.circ().clear_bit()); // circular mode off
+    perip.DMA1.ccr2.modify(|_, w| w.minc().set_bit()); // increment memory ptr
+    perip.DMA1.ccr2.modify(|_, w| w.pinc().clear_bit()); // not increment periph ptr
+    perip.DMA1.ccr2.modify(|_, w| w.mem2mem().clear_bit()); // memory-to-memory mode
+    perip.DMA1.ccr2.modify(|_, w| w.dir().clear_bit()); // read from peripheral
+    perip.DMA1.ccr2.modify(|_, w| w.teie().clear_bit()); // transfer error interrupt enable
+    perip.DMA1.ccr2.modify(|_, w| w.htie().clear_bit()); // half transfer interrupt enable
+    perip.DMA1.ccr2.modify(|_, w| w.tcie().set_bit()); // transfer complete interrupt enable
+
+    // For category 2 devices:
+    // • DMAMUX channels 0 to 5 are connected to DMA1 channels 1 to 6
+    // • DMAMUX channels 6 to 11 are connected to DMA2 channels 1 to 6
+    // DMA1 ch1 -> DMAMUX ch6
+    perip
+        .DMAMUX
+        .c1cr
+        .modify(|_, w| unsafe { w.dmareq_id().bits(25) }); // Table.91 25:USART1_TX
+    perip.DMAMUX.c0cr.modify(|_, w| w.ege().set_bit()); // Enable generate event
+
+    let uart = &perip.USART1;
+    let uart_data_register_addr = &uart.tdr as *const _ as u32;
+    perip
+        .DMA1
+        .cpar1
+        .modify(|_, w| unsafe { w.pa().bits(uart_data_register_addr) }); // peripheral address
+    perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(0) }); // num tmp
+
+    perip
+        .DMA1
+        .cmar1
+        .modify(|_, w| unsafe { w.ma().bits(address) }); // memory address
+
+    // 割り込み設定
+    unsafe{
+        core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0b0);
+        NVIC::unmask(Interrupt::DMA1_CH1);
+        core_perip.NVIC.set_priority(Interrupt::DMA1_CH2, 0b0);
+        NVIC::unmask(Interrupt::DMA1_CH2);
+    }
+
 }
 
 pub fn adc2_init(perip: &Peripherals) {
@@ -484,6 +536,66 @@ impl<'a> Uart1 {
             }
         });
     }
+    fn put_str(&self, s: &str) {
+
+
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let uart = &perip.USART1;
+                // wait for last transmission
+                while uart.isr.read().tc().bit_is_clear() {}
+
+                // DMA mode can be enabled for transmission by setting DMAT bit in the USART_CR3
+                // register. Data are loaded from an SRAM area configured using the DMA peripheral (refer to
+                // the corresponding Direct memory access controller section) to the USART_TDR register
+                // whenever the TXE flag (TXFNF flag if FIFO mode is enabled) is set. To map a DMA channel
+                // for USART transmission, use the following procedure (x denotes the channel number):
+                // 1. Write the USART_TDR register address in the DMA control register to configure it as
+                // the destination of the transfer. The data is moved to this address from memory after
+                // each TXE (or TXFNF if FIFO mode is enabled) event.
+                // 2. Write the memory address in the DMA control register to configure it as the source of
+                // the transfer. The data is loaded into the USART_TDR register from this memory area
+                // after each TXE (or TXFNF if FIFO mode is enabled) event.
+                // 3. Configure the total number of bytes to be transferred to the DMA control register.
+                // 4. Configure the channel priority in the DMA register
+                // 5. Configure DMA interrupt generation after half/ full transfer as required by the
+                // application.
+                // 6. Clear the TC flag in the USART_ISR register by setting the TCCF bit in the
+                // USART_ICR register.
+                // 7. Activate the channel in the DMA register.
+
+
+
+
+
+                perip
+                .DMA1
+                .cmar1
+                .modify(|_, w| unsafe { w.ma().bits(address) }); // memory address
+        
+                perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(0) }); // num tmp
+
+                // enable DMA
+                perip.DMA1.ccr2.modify(|_, w| w.en().set_bit());
+
+                // enable USART
+                // start USART
+                // let uart = &perip.USART1;
+                // uart.tdr.modify(|_, w| unsafe { w.tdr().bits(c.into()) });
+                // // while uart.isr.read().tc().bit_is_set() {}
+                // while uart.isr.read().txe().bit_is_clear() {}
+            }
+        });
+
+
+
+
+        for c in s.bytes() {
+            self.putc(c);
+        }
+    }
+
 }
 
 pub struct Spi3 {}
