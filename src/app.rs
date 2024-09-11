@@ -79,7 +79,7 @@ where
             led1,
             bldc,
             encoder,
-            motor: ThreePhaseMotor::new(12),
+            motor: ThreePhaseMotor::new(12, 0.0, 0.0, 0.0), // 👺仮
             current_sensor,
         }
     }
