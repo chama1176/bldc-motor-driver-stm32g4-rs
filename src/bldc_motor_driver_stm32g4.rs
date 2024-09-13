@@ -154,7 +154,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     }
 
     // DMA1 ch2
-    perip.DMA1.ccr2.modify(|_, w| unsafe { w.pl().bits(0b01) }); // priority level 2
+    perip.DMA1.ccr2.modify(|_, w| unsafe { w.pl().bits(0b01) }); // priority level 1
     perip
         .DMA1
         .ccr2
@@ -186,14 +186,8 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     let uart_data_register_addr = &uart.tdr as *const _ as u32;
     perip
         .DMA1
-        .cpar1
+        .cpar2
         .modify(|_, w| unsafe { w.pa().bits(uart_data_register_addr) }); // peripheral address
-    perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(0) }); // num tmp
-
-    perip
-        .DMA1
-        .cmar1
-        .modify(|_, w| unsafe { w.ma().bits(address) }); // memory address
 
     // 割り込み設定
     unsafe{
@@ -515,6 +509,10 @@ impl<'a> Uart1 {
                 // Set stop bit
                 uart.cr2.modify(|_, w| unsafe { w.stop().bits(0b00) });
 
+                // Set stop bit
+                uart.cr3.modify(|_, w| w.dmat().set_bit() );    // DMA
+
+
                 // Set uart enable
                 uart.cr1.modify(|_, w| w.ue().set_bit());
 
@@ -536,9 +534,7 @@ impl<'a> Uart1 {
             }
         });
     }
-    fn put_str(&self, s: &str) {
-
-
+    pub fn put_str(&self, s: &str) {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
@@ -551,40 +547,40 @@ impl<'a> Uart1 {
                 // the corresponding Direct memory access controller section) to the USART_TDR register
                 // whenever the TXE flag (TXFNF flag if FIFO mode is enabled) is set. To map a DMA channel
                 // for USART transmission, use the following procedure (x denotes the channel number):
+
                 // 1. Write the USART_TDR register address in the DMA control register to configure it as
                 // the destination of the transfer. The data is moved to this address from memory after
                 // each TXE (or TXFNF if FIFO mode is enabled) event.
+
+                // Already set in dma_init fn.
+
                 // 2. Write the memory address in the DMA control register to configure it as the source of
                 // the transfer. The data is loaded into the USART_TDR register from this memory area
                 // after each TXE (or TXFNF if FIFO mode is enabled) event.
-                // 3. Configure the total number of bytes to be transferred to the DMA control register.
-                // 4. Configure the channel priority in the DMA register
-                // 5. Configure DMA interrupt generation after half/ full transfer as required by the
-                // application.
-                // 6. Clear the TC flag in the USART_ISR register by setting the TCCF bit in the
-                // USART_ICR register.
-                // 7. Activate the channel in the DMA register.
-
-
-
-
-
                 perip
                 .DMA1
                 .cmar1
-                .modify(|_, w| unsafe { w.ma().bits(address) }); // memory address
-        
-                perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(0) }); // num tmp
+                .modify(|_, w| unsafe { w.ma().bits(&s as *const _ as u32) }); // memory address
 
-                // enable DMA
+                // 3. Configure the total number of bytes to be transferred to the DMA control register.
+                perip.DMA1.cndtr1.modify(|_, w| unsafe { w.ndt().bits(s.len() as u16) }); // num
+
+                // 4. Configure the channel priority in the DMA register
+
+                // Already set in dma_init fn.
+
+                // 5. Configure DMA interrupt generation after half/ full transfer as required by the
+                // application.
+
+                // Already set in dma_init fn.
+
+                // 6. Clear the TC flag in the USART_ISR register by setting the TCCF bit in the
+                // USART_ICR register.
+                uart.icr.write(|w| w. tccf().set_bit() );
+
+                // 7. Activate the channel in the DMA register.
                 perip.DMA1.ccr2.modify(|_, w| w.en().set_bit());
 
-                // enable USART
-                // start USART
-                // let uart = &perip.USART1;
-                // uart.tdr.modify(|_, w| unsafe { w.tdr().bits(c.into()) });
-                // // while uart.isr.read().tc().bit_is_set() {}
-                // while uart.isr.read().txe().bit_is_clear() {}
             }
         });
 

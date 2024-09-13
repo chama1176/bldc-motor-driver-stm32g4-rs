@@ -279,6 +279,7 @@ fn main() -> ! {
             
                     }
                 });
+                uart.put_str("Hello, from DMA");
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();
                 // write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
 
