@@ -16,6 +16,7 @@
             },
             //!MODIFY
             "chip": "STM32G431RBTx",
+            "probe": "0483:374f",
             "coreConfigs": [
                 {
                 //!MODIFY

@@ -52,6 +52,7 @@ fn DMA1_CH1(){
     static mut TIM3_COUNT: u32 = 0;
     // `TIM3_COUNT` has type `&mut u32` and it's safe to use
     *TIM3_COUNT += 1;
+    // defmt::info!("dma1 ch1!");
     let mut tim_count = 0;
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
@@ -82,11 +83,14 @@ fn DMA1_CH1(){
             }
         }
     });
+    // defmt::info!("dma1 ch1! finish");
 
 }
 
 #[interrupt]
 fn DMA1_CH2(){
+    defmt::info!("dma1 ch2!");
+
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
@@ -106,6 +110,7 @@ fn DMA1_CH2(){
             }
         }
     });
+    defmt::info!("dma1 ch2! finish");
 }
 
 #[interrupt]
@@ -279,7 +284,6 @@ fn main() -> ! {
             
                     }
                 });
-                uart.put_str("Hello, from DMA");
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();
                 // write!(uart, "\"tv\": {:4}\r\n", tv,).unwrap();
 
@@ -296,6 +300,8 @@ fn main() -> ! {
                 // )
                 // .unwrap();
                         
+                defmt::info!("dma start");
+                uart.put_str("Hello, from DMA");
                 defmt::info!("diff: {}", diff_count);
             
                 // // floatのまま送るとFLASHをバカほど食うのでcastする
