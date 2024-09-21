@@ -89,8 +89,6 @@ fn DMA1_CH1(){
 
 #[interrupt]
 fn DMA1_CH2(){
-    defmt::info!("dma1 ch2!");
-
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
@@ -110,7 +108,6 @@ fn DMA1_CH2(){
             }
         }
     });
-    defmt::info!("dma1 ch2! finish");
 }
 
 #[interrupt]
@@ -300,8 +297,7 @@ fn main() -> ! {
                 // )
                 // .unwrap();
                         
-                defmt::info!("dma start");
-                uart.put_str("Hello, from DMA");
+                uart.put_str("Hello, from DMA\r\n");
                 defmt::info!("diff: {}", diff_count);
             
                 // // floatのまま送るとFLASHをバカほど食うのでcastする

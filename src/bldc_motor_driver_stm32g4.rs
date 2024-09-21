@@ -168,7 +168,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.DMA1.ccr2.modify(|_, w| w.pinc().clear_bit()); // not increment periph ptr
     perip.DMA1.ccr2.modify(|_, w| w.mem2mem().clear_bit()); // memory-to-memory mode
     perip.DMA1.ccr2.modify(|_, w| w.dir().set_bit()); // read from memory
-    perip.DMA1.ccr2.modify(|_, w| w.teie().set_bit()); // transfer error interrupt enable
+    perip.DMA1.ccr2.modify(|_, w| w.teie().clear_bit()); // transfer error interrupt enable
     perip.DMA1.ccr2.modify(|_, w| w.htie().clear_bit()); // half transfer interrupt enable
     perip.DMA1.ccr2.modify(|_, w| w.tcie().set_bit()); // transfer complete interrupt enable
 
@@ -509,13 +509,13 @@ impl<'a> Uart1 {
                 // Set stop bit
                 uart.cr2.modify(|_, w| unsafe { w.stop().bits(0b00) });
 
-                // // Set uart enable
-                // uart.cr1.modify(|_, w| w.ue().set_bit());
+                // Set uart enable
+                uart.cr1.modify(|_, w| w.ue().set_bit());
 
-                // // Set uart recieve enable
-                // uart.cr1.modify(|_, w| w.re().set_bit());
-                // // Set uart transmitter enable
-                // uart.cr1.modify(|_, w| w.te().set_bit());
+                // Set uart recieve enable
+                uart.cr1.modify(|_, w| w.re().set_bit());
+                // Set uart transmitter enable
+                uart.cr1.modify(|_, w| w.te().set_bit());
             }
         });
     }
@@ -536,17 +536,8 @@ impl<'a> Uart1 {
             Some(perip) => {
                 let uart = &perip.USART1;
 
-                defmt::info!("tc: {}", uart.isr.read().tc().bits());
-                defmt::info!("txe: {}", uart.isr.read().txe().bits());
-                defmt::info!("tdr: {}", uart.tdr.read().bits());
-                defmt::info!("len: {}", perip.DMA1.cndtr2.read().ndt().bits());
-
                 // wait for last transmission
                 while uart.isr.read().tc().bit_is_clear() {
-                    // defmt::info!("tc: {}", uart.isr.read().tc().bits());
-                    // defmt::info!("txe: {}", uart.isr.read().txe().bits());
-                    // defmt::info!("tdr: {}", uart.tdr.read().bits());
-                    // defmt::info!("len: {}", perip.DMA1.cndtr2.read().ndt().bits());
                 }
 
                 perip.DMA1.ccr2.modify(|_, w| w.en().clear_bit());
@@ -590,22 +581,7 @@ impl<'a> Uart1 {
                 // 7. Activate the channel in the DMA register.
                 perip.DMA1.ccr2.modify(|_, w| w.en().set_bit());
 
-                // Set uart enable
-                uart.cr1.modify(|_, w| w.ue().set_bit());
-
-                // Set uart recieve enable
-                uart.cr1.modify(|_, w| w.re().set_bit());
-                // Set uart transmitter enable
-                uart.cr1.modify(|_, w| w.te().set_bit());
-
                 uart.cr3.modify(|_, w| w.dmat().set_bit() );    // DMA
-                
-
-                defmt::info!("2tc: {}", uart.isr.read().tc().bits());
-                defmt::info!("2txe: {}", uart.isr.read().txe().bits());
-                defmt::info!("2tdr: {}", uart.tdr.read().bits());
-                defmt::info!("2len: {}", perip.DMA1.cndtr2.read().ndt().bits());
-
 
             }
         });
