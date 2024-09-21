@@ -254,7 +254,7 @@ fn main() -> ! {
         });
         if (t + 10000 - prev) % 10000 >= 1000 {
             cnt += 1;
-            if cnt > 100 {
+            if cnt > 200 {
                 // defmt::info!("hello from defmt");
 
                 cnt = 0;
@@ -297,7 +297,7 @@ fn main() -> ! {
                 // )
                 // .unwrap();
                         
-                uart.put_str("Hello, from DMA\r\n");
+                // uart.put_str("Hello, from DMA\r\n");
                 defmt::info!("diff: {}", diff_count);
             
                 // // floatのまま送るとFLASHをバカほど食うのでcastする
@@ -338,12 +338,12 @@ fn main() -> ! {
                 //     (dq_current.i_d * 1000.0) as i32,
                 // )
                 // .unwrap();
-                // write!(
-                //     uart,
-                //     "{{\"q\":{:4}}}\r\n",
-                //     (dq_current.i_q * 1000.0) as i32,
-                // )
-                // .unwrap();
+                write!(
+                    uart,
+                    "{{\"q\":{:4}}}\r\n",
+                    (dq_current.i_q * 1000.0) as i32,
+                )
+                .unwrap();
             
 
 

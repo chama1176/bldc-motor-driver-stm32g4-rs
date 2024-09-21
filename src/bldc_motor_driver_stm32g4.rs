@@ -468,9 +468,17 @@ impl<'a> FrashStorage {
 pub struct Uart1 {}
 impl<'a> Write for Uart1 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.bytes() {
-            self.putc(c);
+        // for c in s.bytes() {
+        //     self.putc(c);
+        // }
+        // 👺
+        // 送信未完了の場合にいきなりreturnすると{}の入ったwrite文は二回の送信に分かれるので送れなくなる
+        for _ in 0..100{
+            if self.last_dma_transmission_is_completed(){
+                break;
+            }
         }
+        self.put_str(s);
         Ok(())
     }
 }
@@ -529,6 +537,18 @@ impl<'a> Uart1 {
                 while uart.isr.read().txe().bit_is_clear() {}
             }
         });
+    }
+    fn last_dma_transmission_is_completed(&self) -> bool {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => { false },
+            Some(perip) => {
+                let uart = &perip.USART1;
+
+                // return if last transmission is not finished
+                uart.isr.read().tc().bit_is_clear()
+            }
+        });
+        false
     }
     pub fn put_str(&self, s: &str) {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {

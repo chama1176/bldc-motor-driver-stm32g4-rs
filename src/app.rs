@@ -174,7 +174,7 @@ where
                     i_d: 0.0,
                     i_q: self.tv * 0.5,
                 };
-                let kp = 2.2;
+                let kp = 1.2;
                 let ki = 0.01;
 
                 let err_current = DQCurrent{
