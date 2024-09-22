@@ -512,7 +512,8 @@ impl<'a> Uart1 {
                 uart.cr1.modify(|_, w| w.m1().clear_bit());
                 // FIFO?
                 // Set baud rate
-                uart.brr.modify(|_, w| unsafe { w.bits(0x4BF) }); // 140MHz / 115200
+                // uart.brr.modify(|_, w| unsafe { w.bits(0x4BF) }); // 140MHz / 115200
+                uart.brr.modify(|_, w| unsafe { w.bits(0x98) }); // 140MHz / 921600 = 152
 
                 // Set stop bit
                 uart.cr2.modify(|_, w| unsafe { w.stop().bits(0b00) });

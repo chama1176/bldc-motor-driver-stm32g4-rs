@@ -308,13 +308,13 @@ fn main() -> ! {
                 // )
                 // .unwrap();
                 
-                // // floatのまま送るとFLASHをバカほど食うのでcastする
-                // write!(
-                //     uart,
-                //     "{{\"ma\":{:4}}}\r\n",
-                //     (mechanical_angle * 1000.0) as i32,
-                // )
-                // .unwrap();
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"ma\":{:4}}}\r\n",
+                    (mechanical_angle * 1000.0) as i32,
+                )
+                .unwrap();
                 
                 // // floatのまま送るとFLASHをバカほど食うのでcastする
                 // write!(
@@ -332,12 +332,12 @@ fn main() -> ! {
                 // .unwrap();
                 
                 // floatのまま送るとFLASHをバカほど食うのでcastする
-                // write!(
-                //     uart,
-                //     "{{\"d\":{:4}}}\r\n",
-                //     (dq_current.i_d * 1000.0) as i32,
-                // )
-                // .unwrap();
+                write!(
+                    uart,
+                    "{{\"d\":{:4}}}\r\n",
+                    (dq_current.i_d * 1000.0) as i32,
+                )
+                .unwrap();
                 write!(
                     uart,
                     "{{\"q\":{:4}}}\r\n",
