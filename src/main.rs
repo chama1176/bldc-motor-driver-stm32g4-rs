@@ -2,11 +2,11 @@
 #![no_main]
 
 // pick a panicking behavior
+use bldc_motor_driver_stm32g4::CurrentSensor;
 use core::cell::RefCell;
 use core::clone;
 use core::fmt::Write;
 use core::ops::DerefMut;
-use bldc_motor_driver_stm32g4::CurrentSensor;
 use defmt_rtt as _;
 use panic_halt as _;
 
@@ -15,10 +15,10 @@ use cortex_m_rt::entry;
 
 use stm32g4::stm32g431;
 use stm32g4::stm32g431::interrupt;
-use stm32g4::stm32g431::Interrupt::{TIM3, DMA1_CH1, DMA1_CH2}; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-                                         // use panic_abort as _; // requires nightly
-                                         // use panic_itm as _; // logs messages over ITM; requires ITM support
-                                         // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
+use stm32g4::stm32g431::Interrupt::{DMA1_CH1, DMA1_CH2, TIM3}; // you can put a breakpoint on `rust_begin_unwind` to catch panics
+                                                               // use panic_abort as _; // requires nightly
+                                                               // use panic_itm as _; // logs messages over ITM; requires ITM support
+                                                               // use panic_semihosting as _; // logs messages to the host stderr; requires a debugger
 
 mod app;
 mod bldc_motor_driver_stm32g4;
@@ -27,10 +27,9 @@ mod indicator;
 use crate::indicator::Indicator;
 
 use motml::encoder::Encoder;
+use motml::motor::ThreePhaseMotor;
 use motml::motor_driver::{self, DQCurrent, ThreePhaseCurrent};
 use motml::utils::Deg;
-use motml::motor::ThreePhaseMotor;
-
 
 static G_APP: Mutex<
     RefCell<
@@ -45,14 +44,11 @@ static G_APP: Mutex<
     >,
 > = Mutex::new(RefCell::new(None));
 
-
-
 #[interrupt]
-fn DMA1_CH1(){
+fn DMA1_CH1() {
     static mut TIM3_COUNT: u32 = 0;
     // `TIM3_COUNT` has type `&mut u32` and it's safe to use
     *TIM3_COUNT += 1;
-    // defmt::info!("dma1 ch1!");
     let mut tim_count = 0;
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
@@ -64,7 +60,7 @@ fn DMA1_CH1(){
             Some(perip) => {
                 if perip.DMA1.isr.read().tcif1().bit_is_set() {
                     perip.DMA1.ifcr.write(|w| w.tcif1().set_bit());
-                }else{
+                } else {
                     // 想定と違う割り込み要因
                     defmt::error!("Something went wrong!");
                     perip.DMA1.ifcr.write(|w| w.gif1().set_bit());
@@ -80,15 +76,20 @@ fn DMA1_CH1(){
                 app.periodic_task();
                 app.diff_count = tim_count as u32 - app.last_tim_count;
                 app.last_tim_count = tim_count as u32;
+                defmt::info!(
+                    "{}, {}, {}, {}",
+                    (app.last_dq_current.i_d * 1000.0) as i32,
+                    (app.last_dq_current.i_q * 1000.0) as i32,
+                    (app.last_ref_dq_current.i_d * 1000.0) as i32,
+                    (app.last_ref_dq_current.i_q * 1000.0) as i32
+                );
             }
         }
     });
-    // defmt::info!("dma1 ch1! finish");
-
 }
 
 #[interrupt]
-fn DMA1_CH2(){
+fn DMA1_CH2() {
     free(|cs| {
         match bldc_motor_driver_stm32g4::G_PERIPHERAL
             .borrow(cs)
@@ -99,7 +100,7 @@ fn DMA1_CH2(){
             Some(perip) => {
                 if perip.DMA1.isr.read().tcif2().bit_is_set() {
                     perip.DMA1.ifcr.write(|w| w.tcif2().set_bit());
-                }else{
+                } else {
                     // 想定と違う割り込み要因
                     defmt::error!("Something went wrong!");
                     perip.DMA1.ifcr.write(|w| w.gif2().set_bit());
@@ -112,7 +113,6 @@ fn DMA1_CH2(){
 
 #[interrupt]
 fn TIM3() {
-
     // mainで初期化済み
     let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
     free(|cs| {
@@ -130,9 +130,14 @@ fn TIM3() {
     free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
         None => {
             return;
-        },
+        }
         Some(app) => {
-            let adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
+            let adcd = free(|cs| {
+                bldc_motor_driver_stm32g4::G_ADC_DATA
+                    .borrow(cs)
+                    .borrow()
+                    .clone()
+            });
 
             let mut tv = (adcd[1] as f32 - 2000.0f32) / 1000.0f32;
             if tv > 1.0 {
@@ -153,9 +158,6 @@ fn TIM3() {
             }
         }
     });
-
-
-
 }
 
 defmt::timestamp!("{=u32:us}", {
@@ -167,9 +169,7 @@ defmt::timestamp!("{=u32:us}", {
             .as_ref()
         {
             None => 0,
-            Some(perip) => {
-                perip.TIM3.cnt.read().cnt().bits() as u32
-            }
+            Some(perip) => perip.TIM3.cnt.read().cnt().bits() as u32 * 2,
         }
     })
 });
@@ -178,7 +178,8 @@ defmt::timestamp!("{=u32:us}", {
 fn main() -> ! {
     use stm32g4::stm32g431;
 
-    defmt::info!("Hello, from STM32G4!");
+    defmt::debug!("Hello, from STM32G4!");
+    defmt::info!("i_d, i_q, i_d_ref, i_q_ref");
     // stm32f401モジュールより、ペリフェラルの入り口となるオブジェクトを取得する。
     let perip = stm32g431::Peripherals::take().unwrap();
     let mut core_perip = stm32g431::CorePeripherals::take().unwrap();
@@ -193,8 +194,6 @@ fn main() -> ! {
 
     let mut uart = bldc_motor_driver_stm32g4::Uart1::new();
     uart.init();
-    let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
-    pwm.init();
 
     let spi = bldc_motor_driver_stm32g4::Spi3::new();
     spi.init();
@@ -213,12 +212,20 @@ fn main() -> ! {
 
     // Setup motor driver
     // Change Buck Convetor Frequency
-    // spi.txrx(0x917000);
-    // spi.txrx(0x110000);
+    spi.txrx(0x91F003);
+    spi.txrx(0x110000);
 
     // Set Dead Time
     spi.txrx(0x800000 | 0x1B_0000);
     spi.txrx(0x000000 | 0x1B_0000);
+
+    // Charge Pump Configuration
+    spi.txrx(0x800000 | 0x1C_0006);
+    spi.txrx(0x000000 | 0x1C_0000);
+
+    let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
+    pwm.init(); // この行を増やすとノイズが急増
+    コンデンサの周波数応答を確認
 
     let app = app::App::new(led0, led1, pwm, spi_enc, current_sensor);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
@@ -272,13 +279,17 @@ fn main() -> ! {
                     Some(app) => {
                         // rad = app.read_encoder_data();
                         calib_count = app.calib_count();
-                        adcd =  free(|cs| bldc_motor_driver_stm32g4::G_ADC_DATA.borrow(cs).borrow().clone());
+                        adcd = free(|cs| {
+                            bldc_motor_driver_stm32g4::G_ADC_DATA
+                                .borrow(cs)
+                                .borrow()
+                                .clone()
+                        });
                         electrical_angle = app.last_electrical_angle;
                         mechanical_angle = app.last_mechanical_angle;
                         current = app.last_current;
                         dq_current = app.last_dq_current;
                         diff_count = app.diff_count;
-            
                     }
                 });
                 // write!(uart, "{}, {:4}, {:4}", calib_count, deg, rad).unwrap();
@@ -296,10 +307,10 @@ fn main() -> ! {
                 //     adcd[6]
                 // )
                 // .unwrap();
-                        
+
                 // uart.put_str("Hello, from DMA\r\n");
-                defmt::info!("diff: {}", diff_count);
-            
+                // defmt::info!("diff: {}", diff_count);
+
                 // // floatのまま送るとFLASHをバカほど食うのでcastする
                 // write!(
                 //     uart,
@@ -307,7 +318,7 @@ fn main() -> ! {
                 //     (electrical_angle * 1000.0) as i32,
                 // )
                 // .unwrap();
-                
+
                 // floatのまま送るとFLASHをバカほど食うのでcastする
                 write!(
                     uart,
@@ -315,7 +326,7 @@ fn main() -> ! {
                     (mechanical_angle * 1000.0) as i32,
                 )
                 .unwrap();
-                
+
                 // // floatのまま送るとFLASHをバカほど食うのでcastする
                 // write!(
                 //     uart,
@@ -330,23 +341,10 @@ fn main() -> ! {
                 //     (current.i_v * 1000.0) as i32,
                 // )
                 // .unwrap();
-                
+
                 // floatのまま送るとFLASHをバカほど食うのでcastする
-                write!(
-                    uart,
-                    "{{\"d\":{:4}}}\r\n",
-                    (dq_current.i_d * 1000.0) as i32,
-                )
-                .unwrap();
-                write!(
-                    uart,
-                    "{{\"q\":{:4}}}\r\n",
-                    (dq_current.i_q * 1000.0) as i32,
-                )
-                .unwrap();
-            
-
-
+                write!(uart, "{{\"d\":{:4}}}\r\n", (dq_current.i_d * 1000.0) as i32,).unwrap();
+                write!(uart, "{{\"q\":{:4}}}\r\n", (dq_current.i_q * 1000.0) as i32,).unwrap();
             }
             prev = t;
         }

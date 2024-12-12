@@ -24,7 +24,7 @@ pub static G_PERIPHERAL: Mutex<RefCell<Option<stm32g4::stm32g431::Peripherals>>>
     Mutex::new(RefCell::new(None));
 
 // DMAの転送先
-pub static G_ADC_DATA: Mutex<RefCell<[u16; 7]>> = Mutex::new(RefCell::new([77;7]));
+pub static G_ADC_DATA: Mutex<RefCell<[u16; 7]>> = Mutex::new(RefCell::new([77; 7]));
 
 pub fn init_g_peripheral(perip: Peripherals) {
     free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
@@ -61,7 +61,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 
     perip.RCC.cfgr.modify(|_, w| w.sw().pll());
     // perip.RCC.cfgr.modify(|_, w| w.sw().hse());
-    defmt::info!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
+    defmt::debug!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
     while !perip.RCC.cfgr.read().sw().is_pll() {}
     while !perip.RCC.cfgr.read().sws().is_pll() {
         defmt::info!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
@@ -88,13 +88,12 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // For ADC
     let tim6 = &perip.TIM6;
     tim6.psc.modify(|_, w| unsafe { w.bits(1400 - 1) });
-    tim6.arr.modify(|_, w| unsafe { w.bits(10 - 1) }); // 10kHz
+    tim6.arr.modify(|_, w| unsafe { w.bits(20 - 1) }); // 5kHz
     tim6.dier.modify(|_, w| w.uie().set_bit());
     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
 }
 
 pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
-
     let address = free(|cs| G_ADC_DATA.borrow(cs).borrow().as_ptr() as u32);
 
     // DMAの電源投入(クロックの有効化)
@@ -148,7 +147,7 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
         .modify(|_, w| unsafe { w.ma().bits(address) }); // memory address
 
     // 割り込み設定
-    unsafe{
+    unsafe {
         core_perip.NVIC.set_priority(Interrupt::DMA1_CH1, 0b0);
         NVIC::unmask(Interrupt::DMA1_CH1);
     }
@@ -190,13 +189,12 @@ pub fn dma_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
         .modify(|_, w| unsafe { w.pa().bits(uart_data_register_addr) }); // peripheral address
 
     // 割り込み設定
-    unsafe{
+    unsafe {
         core_perip.NVIC.set_priority(Interrupt::DMA1_CH2, 0b10);
         NVIC::unmask(Interrupt::DMA1_CH2);
         core_perip.NVIC.set_priority(Interrupt::USART1, 0b10);
         NVIC::unmask(Interrupt::USART1);
     }
-
 }
 
 pub fn adc2_init(perip: &Peripherals) {
@@ -317,13 +315,15 @@ impl<'a> CurrentSensor {
     }
     /// Return value in Ampere
     pub fn get_current(&self) -> ThreePhaseCurrent<f32> {
-        let adcd =  free(|cs| G_ADC_DATA.borrow(cs).borrow().clone());
+        let adcd = free(|cs| G_ADC_DATA.borrow(cs).borrow().clone());
         // I = V / R
         // 60V/V, 0.003
         // 基準電圧1.5V
         ThreePhaseCurrent::<f32> {
-            i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - self.u_current_offset,
-            i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003 - self.v_current_offset,
+            i_u: (((adcd[2] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003
+                - self.u_current_offset,
+            i_v: (((adcd[3] as f32) / adcd[6] as f32 * 1.5) - 1.5) / 60.0 / 0.003
+                - self.v_current_offset,
             i_w: 0.0,
         }
     }
@@ -473,8 +473,8 @@ impl<'a> Write for Uart1 {
         // }
         // 👺
         // 送信未完了の場合にいきなりreturnすると{}の入ったwrite文は二回の送信に分かれるので送れなくなる
-        for _ in 0..100{
-            if self.last_dma_transmission_is_completed(){
+        for _ in 0..100 {
+            if self.last_dma_transmission_is_completed() {
                 break;
             }
         }
@@ -541,7 +541,7 @@ impl<'a> Uart1 {
     }
     fn last_dma_transmission_is_completed(&self) -> bool {
         free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-            None => { false },
+            None => false,
             Some(perip) => {
                 let uart = &perip.USART1;
 
@@ -558,8 +558,7 @@ impl<'a> Uart1 {
                 let uart = &perip.USART1;
 
                 // wait for last transmission
-                while uart.isr.read().tc().bit_is_clear() {
-                }
+                while uart.isr.read().tc().bit_is_clear() {}
 
                 perip.DMA1.ccr2.modify(|_, w| w.en().clear_bit());
 
@@ -579,12 +578,15 @@ impl<'a> Uart1 {
                 // the transfer. The data is loaded into the USART_TDR register from this memory area
                 // after each TXE (or TXFNF if FIFO mode is enabled) event.
                 perip
-                .DMA1
-                .cmar2
-                .modify(|_, w| unsafe { w.ma().bits(s.as_ptr() as u32) }); // memory address
+                    .DMA1
+                    .cmar2
+                    .modify(|_, w| unsafe { w.ma().bits(s.as_ptr() as u32) }); // memory address
 
                 // 3. Configure the total number of bytes to be transferred to the DMA control register.
-                perip.DMA1.cndtr2.modify(|_, w| unsafe { w.ndt().bits(s.len() as u16) }); // num
+                perip
+                    .DMA1
+                    .cndtr2
+                    .modify(|_, w| unsafe { w.ndt().bits(s.len() as u16) }); // num
 
                 // 4. Configure the channel priority in the DMA register
 
@@ -597,17 +599,15 @@ impl<'a> Uart1 {
 
                 // 6. Clear the TC flag in the USART_ISR register by setting the TCCF bit in the
                 // USART_ICR register.
-                uart.icr.write(|w| w. tccf().set_bit() );
+                uart.icr.write(|w| w.tccf().set_bit());
 
                 // 7. Activate the channel in the DMA register.
                 perip.DMA1.ccr2.modify(|_, w| w.en().set_bit());
 
-                uart.cr3.modify(|_, w| w.dmat().set_bit() );    // DMA
-
+                uart.cr3.modify(|_, w| w.dmat().set_bit()); // DMA
             }
         });
     }
-
 }
 
 pub struct Spi3 {}
@@ -853,9 +853,9 @@ impl<'a> BldcPwm {
                 gpiob.moder.modify(|_, w| w.moder15().alternate());
                 gpiob.moder.modify(|_, w| w.moder14().alternate());
                 gpiob.moder.modify(|_, w| w.moder13().alternate());
-                gpioa.afrh.modify(|_, w| w.afrh8().af6());  // TIM1 CH1 HC
-                gpioa.afrh.modify(|_, w| w.afrh9().af6());  // TIM1 CH2 HB
-                gpioa.afrh.modify(|_, w| w.afrh10().af6());  // TIM1 CH3 HA
+                gpioa.afrh.modify(|_, w| w.afrh8().af6()); // TIM1 CH1 HC
+                gpioa.afrh.modify(|_, w| w.afrh9().af6()); // TIM1 CH2 HB
+                gpioa.afrh.modify(|_, w| w.afrh10().af6()); // TIM1 CH3 HA
                 gpiob.afrh.modify(|_, w| w.afrh13().af6()); // TIM1 CH1N LC
                 gpiob.afrh.modify(|_, w| w.afrh14().af6()); // TIM1 CH2N LB
                 gpiob.afrh.modify(|_, w| w.afrh15().af4()); // TIM1 CH3N LA

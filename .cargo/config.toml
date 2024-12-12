@@ -12,8 +12,11 @@ runner = [
   "run",
   "--chip",
   "STM32G431RBTx",
+#  "--speed",
+#  "200",
   "--log-format",
-  "{L} {s}",
+  "{t}, {s}",
+#  "{t} {L} {s}",
   "--probe",
   "0483:374f",
 ]

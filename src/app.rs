@@ -42,8 +42,10 @@ where
     pub last_mechanical_angle: f32, // debug
     pub last_current: ThreePhaseCurrent<f32>,
     pub last_dq_current: DQCurrent<f32>,
+    pub last_ref_dq_current: DQCurrent<f32>,
     pub last_tim_count: u32,
     pub diff_count: u32,
+    pub dq_current_log: [DQCurrent<f32>; 1000],
     // [Device]
     led0: T0,
     led1: T1,
@@ -73,8 +75,10 @@ where
             last_mechanical_angle: 0.0,
             last_current: ThreePhaseCurrent::default(),
             last_dq_current: DQCurrent::default(),
+            last_ref_dq_current: DQCurrent::default(),
             last_tim_count: 0,
             diff_count: 0,
+            dq_current_log: [DQCurrent::default(); 1000],
             led0,
             led1,
             bldc,
@@ -96,6 +100,10 @@ where
         self.last_current = current;
         self.last_dq_current = dq_current;
         self.calib_count = 7;
+        self.last_ref_dq_current = DQCurrent{
+            i_d: 0.0,
+            i_q: 0.0,
+        };
 
         let mut tp = ThreePhaseVoltage::<f32> { v_u: 0., v_v: 0., v_w: 0. };
         let mut tpe: ThreePhaseValue<OutputStatus> = ThreePhaseValue { u: OutputStatus::Disable, v: OutputStatus::Disable, w: OutputStatus::Disable };
@@ -174,8 +182,9 @@ where
                     i_d: 0.0,
                     i_q: self.tv * 0.5,
                 };
-                let kp = 1.0;
-                let ki = 0.01;
+                let kp = 1.2;
+                let ki = 0.001;
+                self.last_ref_dq_current = ref_current;
 
                 let err_current = DQCurrent{
                     i_d: dq_current.i_d - ref_current.i_d,
