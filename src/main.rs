@@ -76,13 +76,13 @@ fn DMA1_CH1() {
                 app.periodic_task();
                 app.diff_count = tim_count as u32 - app.last_tim_count;
                 app.last_tim_count = tim_count as u32;
-                defmt::info!(
-                    "{}, {}, {}, {}",
-                    (app.last_dq_current.i_d * 1000.0) as i32,
-                    (app.last_dq_current.i_q * 1000.0) as i32,
-                    (app.last_ref_dq_current.i_d * 1000.0) as i32,
-                    (app.last_ref_dq_current.i_q * 1000.0) as i32
-                );
+                // defmt::info!(
+                //     "{}, {}, {}, {}",
+                //     (app.last_dq_current.i_d * 1000.0) as i32,
+                //     (app.last_dq_current.i_q * 1000.0) as i32,
+                //     (app.last_ref_dq_current.i_d * 1000.0) as i32,
+                //     (app.last_ref_dq_current.i_q * 1000.0) as i32
+                // );
             }
         }
     });
@@ -225,7 +225,6 @@ fn main() -> ! {
 
     let pwm = bldc_motor_driver_stm32g4::BldcPwm::new();
     pwm.init(); // この行を増やすとノイズが急増
-    コンデンサの周波数応答を確認
 
     let app = app::App::new(led0, led1, pwm, spi_enc, current_sensor);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
@@ -322,7 +321,7 @@ fn main() -> ! {
                 // floatのまま送るとFLASHをバカほど食うのでcastする
                 write!(
                     uart,
-                    "{{\"ma\":{:4}}}\r\n",
+                    "{{\"ma\":{:}}}\r\n",
                     (mechanical_angle * 1000.0) as i32,
                 )
                 .unwrap();

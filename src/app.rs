@@ -62,15 +62,16 @@ where
     M: ThreePhaseMotorDriver,
     E: Encoder<f32>,
 {
+    // 修理エンコーダバグってる
     pub fn new(led0: T0, led1: T1, bldc: M, encoder: E, current_sensor: CurrentSensor) -> Self {
         Self {
             tv: 0.0,
             count: 0,
             calib_count: 0,
             control_mode: ControlMode::Waiting,
-            encoder_offset: 0.238,
-            control_err_integral: DQCurrent::default(),
+            encoder_offset: 0.135,
             // encoder_offset: 0.0,
+            control_err_integral: DQCurrent::default(),
             last_electrical_angle: 0.0,
             last_mechanical_angle: 0.0,
             last_current: ThreePhaseCurrent::default(),
@@ -183,7 +184,7 @@ where
                     i_q: self.tv * 0.5,
                 };
                 let kp = 1.2;
-                let ki = 0.001;
+                let ki = 0.002;
                 self.last_ref_dq_current = ref_current;
 
                 let err_current = DQCurrent{
@@ -223,10 +224,10 @@ where
                 self.calib_count = s as u8;
             }
             ControlMode::Calibrating => {
-                // tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
-                // tp = ThreePhaseVoltage{ v_u: 0.6, v_v: 0.4, v_w: 0.4 };
-                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable };
-                tp = ThreePhaseVoltage{ v_u: 0.52, v_v: 0.48, v_w: 0.0 };
+                tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Enable };
+                tp = ThreePhaseVoltage{ v_u: 0.6, v_v: 0.4, v_w: 0.4 };
+                // tpe = ThreePhaseValue { u: OutputStatus::Enable, v: OutputStatus::Enable, w: OutputStatus::Disable };
+                // tp = ThreePhaseVoltage{ v_u: 0.52, v_v: 0.48, v_w: 0.0 };
             }
             _ =>{
                 tpe = ThreePhaseValue { u: OutputStatus::Disable, v: OutputStatus::Disable, w: OutputStatus::Disable };
