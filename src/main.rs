@@ -76,13 +76,13 @@ fn DMA1_CH1() {
                 app.periodic_task();
                 app.diff_count = tim_count as u32 - app.last_tim_count;
                 app.last_tim_count = tim_count as u32;
-                // defmt::info!(
-                //     "{}, {}, {}, {}",
-                //     (app.last_dq_current.i_d * 1000.0) as i32,
-                //     (app.last_dq_current.i_q * 1000.0) as i32,
-                //     (app.last_ref_dq_current.i_d * 1000.0) as i32,
-                //     (app.last_ref_dq_current.i_q * 1000.0) as i32
-                // );
+                defmt::info!(
+                    "{}, {}, {}, {}",
+                    (app.last_dq_current.i_d * 1000.0) as i32,
+                    (app.last_dq_current.i_q * 1000.0) as i32,
+                    (app.last_ref_dq_current.i_d * 1000.0) as i32,
+                    (app.last_ref_dq_current.i_q * 1000.0) as i32
+                );
             }
         }
     });

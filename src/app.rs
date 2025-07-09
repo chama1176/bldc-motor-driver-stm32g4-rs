@@ -62,7 +62,6 @@ where
     M: ThreePhaseMotorDriver,
     E: Encoder<f32>,
 {
-    // 修理エンコーダバグってる
     pub fn new(led0: T0, led1: T1, bldc: M, encoder: E, current_sensor: CurrentSensor) -> Self {
         Self {
             tv: 0.0,
