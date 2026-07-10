@@ -326,20 +326,20 @@ fn main() -> ! {
                 )
                 .unwrap();
 
-                // // floatのまま送るとFLASHをバカほど食うのでcastする
-                // write!(
-                //     uart,
-                //     "{{\"iu\":{:4}}}\r\n",
-                //     (current.i_u * 1000.0) as i32,
-                // )
-                // .unwrap();
-                // // floatのまま送るとFLASHをバカほど食うのでcastする
-                // write!(
-                //     uart,
-                //     "{{\"iv\":{:4}}}\r\n",
-                //     (current.i_v * 1000.0) as i32,
-                // )
-                // .unwrap();
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"iu\":{:4}}}\r\n",
+                    (current.i_u * 1000.0) as i32,
+                )
+                .unwrap();
+                // floatのまま送るとFLASHをバカほど食うのでcastする
+                write!(
+                    uart,
+                    "{{\"iv\":{:4}}}\r\n",
+                    (current.i_v * 1000.0) as i32,
+                )
+                .unwrap();
 
                 // floatのまま送るとFLASHをバカほど食うのでcastする
                 write!(uart, "{{\"d\":{:4}}}\r\n", (dq_current.i_d * 1000.0) as i32,).unwrap();

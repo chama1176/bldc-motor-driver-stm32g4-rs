@@ -891,6 +891,8 @@ impl<'a> BldcPwm {
                 // enable tim
                 tim.cr1.modify(|_, w| w.cen().set_bit());
                 // BDTR break and dead-time register
+
+                // Main output enable
                 tim.bdtr.modify(|_, w| w.moe().set_bit());
                 // CCxE enable output
                 tim.ccer.modify(|_, w| w.cc1e().set_bit());
